@@ -17,7 +17,10 @@ class DailyRoutineApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        textTheme: GoogleFonts.notoSansTextTheme(),
+        textTheme: GoogleFonts.notoSansScTextTheme().apply(
+          bodyColor: Colors.brown[900],
+          displayColor: Colors.brown[900],
+        ),
       ),
       home: const HabitListPage(),
     );
@@ -229,20 +232,20 @@ class _HabitCard extends StatelessWidget {
                       children: [
                         Text(
                           habit.name,
-                          style: GoogleFonts.notoSans(
+                          style: GoogleFonts.notoSansSc(
                             color: Colors.brown[900],
                             fontWeight: FontWeight.w700,
-                            fontSize: 20,
+                            fontSize: 18,
                             letterSpacing: 0.3,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           '本月已完成 $checkedDays/$daysInMonth 天',
-                          style: GoogleFonts.notoSans(
+                          style: GoogleFonts.notoSansSc(
                             color: Colors.brown[700]?.withOpacity(0.7),
                             fontWeight: FontWeight.w500,
-                            fontSize: 14,
+                            fontSize: 18,
                           ),
                         ),
                       ],
@@ -372,7 +375,7 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                                   const SizedBox(width: 12),
                                   Text(
                                     widget.habit.name,
-                                    style: GoogleFonts.notoSans(
+                                    style: GoogleFonts.notoSansSc(
                                       color: Colors.brown[900],
                                       fontWeight: FontWeight.bold,
                                       fontSize: 18,
@@ -417,9 +420,9 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                             headerStyle: HeaderStyle(
                               titleCentered: true,
                               formatButtonVisible: false,
-                              titleTextStyle: GoogleFonts.notoSans(
+                              titleTextStyle: GoogleFonts.notoSansSc(
                                 color: Colors.brown[900],
-                                fontSize: 20,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
                               leftChevronIcon: Icon(
@@ -432,26 +435,31 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                               ),
                             ),
                             daysOfWeekStyle: DaysOfWeekStyle(
-                              weekdayStyle: GoogleFonts.notoSans(
+                              weekdayStyle: GoogleFonts.notoSansSc(
                                 color: Colors.brown[700],
                                 fontWeight: FontWeight.w600,
+                                fontSize: 18,
                               ),
-                              weekendStyle: GoogleFonts.notoSans(
+                              weekendStyle: GoogleFonts.notoSansSc(
                                 color: Colors.brown[700],
                                 fontWeight: FontWeight.w600,
+                                fontSize: 18,
                               ),
                             ),
                             calendarStyle: CalendarStyle(
-                              defaultTextStyle: GoogleFonts.notoSans(
+                              defaultTextStyle: GoogleFonts.notoSansSc(
                                 color: Colors.brown[900],
                                 fontWeight: FontWeight.w500,
+                                fontSize: 18,
                               ),
-                              weekendTextStyle: GoogleFonts.notoSans(
+                              weekendTextStyle: GoogleFonts.notoSansSc(
                                 color: Colors.brown[900],
                                 fontWeight: FontWeight.w500,
+                                fontSize: 18,
                               ),
-                              outsideTextStyle: GoogleFonts.notoSans(
+                              outsideTextStyle: GoogleFonts.notoSansSc(
                                 color: Colors.brown[400],
+                                fontSize: 18,
                               ),
                               todayDecoration: BoxDecoration(
                                 color: const Color(0xFFFF8C00).withOpacity(0.3),
@@ -549,10 +557,10 @@ class _CalendarDayCell extends StatelessWidget {
           // 日期数字
           Text(
             '${day.day}',
-            style: GoogleFonts.notoSans(
+            style: GoogleFonts.notoSansSc(
               color: Colors.brown[900],
               fontWeight: FontWeight.w500,
-              fontSize: 16,
+              fontSize: 18,
             ),
           ),
 
@@ -733,27 +741,29 @@ class _LuxuryGlassHeader extends StatelessWidget {
             children: [
               Text(
                 _todayLabel(),
-                style: GoogleFonts.notoSans(
+                style: GoogleFonts.notoSansSc(
                   color: Colors.brown[900]?.withOpacity(0.7),
                   fontWeight: FontWeight.w500,
+                  fontSize: 18,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 '今天也要好好生活呀',
-                style: GoogleFonts.notoSans(
+                style: GoogleFonts.notoSansSc(
                   color: Colors.brown[900],
                   fontWeight: FontWeight.bold,
-                  fontSize: 24,
+                  fontSize: 18,
                   letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Daily Routine · 日常习惯记录',
-                style: GoogleFonts.notoSans(
+                style: GoogleFonts.notoSansSc(
                   color: Colors.brown[800]?.withOpacity(0.6),
                   fontWeight: FontWeight.w400,
+                  fontSize: 18,
                 ),
               ),
             ],
@@ -803,10 +813,10 @@ class _LuxuryAddButton extends StatelessWidget {
             ),
             label: Text(
               '添加习惯',
-              style: GoogleFonts.notoSans(
+              style: GoogleFonts.notoSansSc(
                 color: Colors.brown[900],
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 18,
               ),
             ),
           ),
