@@ -118,6 +118,11 @@ class Habit {
       'menu_book_rounded': Icons.menu_book_rounded,
       'fitness_center_rounded': Icons.fitness_center_rounded,
       'check_circle_rounded': Icons.check_circle_rounded,
+      'local_cafe_rounded': Icons.local_cafe_rounded,
+      'restaurant_rounded': Icons.restaurant_rounded,
+      'nightlight_rounded': Icons.nightlight_rounded,
+      'self_improvement_rounded': Icons.self_improvement_rounded,
+      'directions_run_rounded': Icons.directions_run_rounded,
     };
     return iconMap[iconName] ?? Icons.check_circle_rounded;
   }
@@ -219,6 +224,27 @@ class _HabitListPageState extends State<HabitListPage> {
     }
   }
 
+  // 添加新习惯
+  Future<void> _addNewHabit() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const AddHabitDialog(),
+    );
+
+    if (result != null) {
+      setState(() {
+        habits.add(Habit(
+          id: 'habit_${DateTime.now().millisecondsSinceEpoch}',
+          name: result['name'],
+          icon: result['icon'],
+          iconName: result['iconName'],
+          color: result['color'],
+        ));
+      });
+      await _saveHabits();
+    }
+  }
+
   // 导出备份
   Future<void> _exportBackup() async {
     try {
@@ -295,17 +321,8 @@ class _HabitListPageState extends State<HabitListPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 头部带设置按钮
-                  Row(
-                    children: [
-                      Expanded(child: const _LuxuryGlassHeader()),
-                      const SizedBox(width: 12),
-                      _SettingsButton(
-                        onExport: _exportBackup,
-                        onImport: _importBackup,
-                      ),
-                    ],
-                  ),
+                  // 头部
+                  const _LuxuryGlassHeader(),
                   const SizedBox(height: 32),
                   Expanded(
                     child: habits.isEmpty
@@ -349,9 +366,306 @@ class _HabitListPageState extends State<HabitListPage> {
               ),
             ),
           ),
+
+          // 右上角设置按钮
+          Positioned(
+            top: 40,
+            right: 24,
+            child: _SettingsButton(
+              onExport: _exportBackup,
+              onImport: _importBackup,
+            ),
+          ),
         ],
       ),
-      floatingActionButton: const _LuxuryAddButton(),
+      floatingActionButton: _LuxuryAddButton(
+        onPressed: _addNewHabit,
+      ),
+    );
+  }
+}
+
+// 添加习惯对话框
+class AddHabitDialog extends StatefulWidget {
+  const AddHabitDialog({super.key});
+
+  @override
+  State<AddHabitDialog> createState() => _AddHabitDialogState();
+}
+
+class _AddHabitDialogState extends State<AddHabitDialog> {
+  final _nameController = TextEditingController();
+  IconData _selectedIcon = Icons.check_circle_rounded;
+  String _selectedIconName = 'check_circle_rounded';
+  Color _selectedColor = const Color(0xFFFFD700);
+
+  final List<Map<String, dynamic>> _availableIcons = [
+    {'icon': Icons.shower_rounded, 'name': 'shower_rounded', 'label': '洗澡'},
+    {'icon': Icons.pets_rounded, 'name': 'pets_rounded', 'label': '宠物'},
+    {'icon': Icons.menu_book_rounded, 'name': 'menu_book_rounded', 'label': '阅读'},
+    {'icon': Icons.fitness_center_rounded, 'name': 'fitness_center_rounded', 'label': '健身'},
+    {'icon': Icons.local_cafe_rounded, 'name': 'local_cafe_rounded', 'label': '咖啡'},
+    {'icon': Icons.restaurant_rounded, 'name': 'restaurant_rounded', 'label': '用餐'},
+    {'icon': Icons.nightlight_rounded, 'name': 'nightlight_rounded', 'label': '睡眠'},
+    {'icon': Icons.self_improvement_rounded, 'name': 'self_improvement_rounded', 'label': '冥想'},
+  ];
+
+  final List<Color> _availableColors = [
+    const Color(0xFFFFD700), // 金色
+    const Color(0xFFFF8C00), // 深橙
+    const Color(0xFF4CAF50), // 绿色
+    const Color(0xFF2196F3), // 蓝色
+    const Color(0xFF9C27B0), // 紫色
+    const Color(0xFFE91E63), // 粉红
+    const Color(0xFFFF5722), // 橙红
+    const Color(0xFF00BCD4), // 青色
+  ];
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              color: Colors.white.withOpacity(0.15),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '添加新习惯',
+                    style: GoogleFonts.notoSansSc(
+                      color: Colors.brown[900],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 习惯名称
+                  TextField(
+                    controller: _nameController,
+                    style: GoogleFonts.notoSansSc(
+                      color: Colors.brown[900],
+                      fontSize: 18,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: '习惯名称',
+                      labelStyle: GoogleFonts.notoSansSc(
+                        color: Colors.brown[700],
+                        fontSize: 18,
+                      ),
+                      hintText: '例如：早起、跑步',
+                      hintStyle: GoogleFonts.notoSansSc(
+                        color: Colors.brown[400],
+                        fontSize: 18,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.2),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(
+                          color: _selectedColor,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 选择图标
+                  Text(
+                    '选择图标',
+                    style: GoogleFonts.notoSansSc(
+                      color: Colors.brown[900],
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: _availableIcons.map((iconData) {
+                      final isSelected = _selectedIconName == iconData['name'];
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedIcon = iconData['icon'];
+                            _selectedIconName = iconData['name'];
+                          });
+                        },
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? _selectedColor.withOpacity(0.3)
+                                : Colors.white.withOpacity(0.1),
+                            border: Border.all(
+                              color: isSelected
+                                  ? _selectedColor
+                                  : Colors.white.withOpacity(0.3),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Icon(
+                            iconData['icon'],
+                            color: isSelected
+                                ? _selectedColor
+                                : Colors.brown[700],
+                            size: 28,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 选择颜色
+                  Text(
+                    '选择颜色',
+                    style: GoogleFonts.notoSansSc(
+                      color: Colors.brown[900],
+                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: _availableColors.map((color) {
+                      final isSelected = _selectedColor == color;
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedColor = color;
+                          });
+                        },
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: color,
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.transparent,
+                              width: 3,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: color.withOpacity(0.5),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: 24,
+                                )
+                              : null,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // 按钮
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          '取消',
+                          style: GoogleFonts.notoSansSc(
+                            color: Colors.brown[700],
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () {
+                          if (_nameController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('请输入习惯名称')),
+                            );
+                            return;
+                          }
+                          Navigator.pop(context, {
+                            'name': _nameController.text.trim(),
+                            'icon': _selectedIcon,
+                            'iconName': _selectedIconName,
+                            'color': _selectedColor,
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _selectedColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: Text(
+                          '添加',
+                          style: GoogleFonts.notoSansSc(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1054,7 +1368,11 @@ class _LuxuryGlassHeader extends StatelessWidget {
 
 // 奢华添加按钮
 class _LuxuryAddButton extends StatelessWidget {
-  const _LuxuryAddButton();
+  final VoidCallback onPressed;
+
+  const _LuxuryAddButton({
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1079,9 +1397,7 @@ class _LuxuryAddButton extends StatelessWidget {
             ],
           ),
           child: FloatingActionButton.extended(
-            onPressed: () {
-              // TODO: 弹出新建习惯对话框
-            },
+            onPressed: onPressed,
             backgroundColor: Colors.transparent,
             elevation: 0,
             icon: const Icon(
