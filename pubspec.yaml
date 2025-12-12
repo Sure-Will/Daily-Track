@@ -41,6 +41,13 @@ dependencies:
   # Table Calendar for habit tracking
   table_calendar: ^3.0.9
 
+  # Local storage
+  shared_preferences: ^2.2.2
+
+  # File operations
+  file_picker: ^6.1.1
+  universal_html: ^2.2.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

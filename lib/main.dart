@@ -2,6 +2,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'models/backup_v1.dart';
+import 'services/storage_service.dart';
+import 'services/backup_service.dart';
 
 void main() {
   runApp(const DailyRoutineApp());
@@ -32,14 +35,19 @@ class Habit {
   final String id;
   final String name;
   final IconData icon;
+  final String iconName;
+  final Color color;
   final Set<DateTime> checkedDates;
 
   Habit({
     required this.id,
     required this.name,
     required this.icon,
+    required this.iconName,
+    Color? color,
     Set<DateTime>? checkedDates,
-  }) : checkedDates = checkedDates ?? {};
+  })  : color = color ?? const Color(0xFFFFD700),
+        checkedDates = checkedDates ?? {};
 
   // 检查某一天是否已打卡
   bool isCheckedOn(DateTime date) {
@@ -57,6 +65,62 @@ class Habit {
       checkedDates.add(normalizedDate);
     }
   }
+
+  // 转换为备份格式
+  HabitBackup toBackup() {
+    return HabitBackup(
+      id: id,
+      title: name,
+      icon: iconName,
+      color: '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+      records: HabitBackup.fromDateTimeSet(checkedDates),
+    );
+  }
+
+  // 从备份格式创建
+  static Habit fromBackup(HabitBackup backup) {
+    // Parse icon
+    IconData icon = Icons.check_circle_rounded;
+    String iconName = backup.icon ?? 'check_circle_rounded';
+    try {
+      icon = _parseIconName(iconName);
+    } catch (e) {
+      icon = Icons.check_circle_rounded;
+      iconName = 'check_circle_rounded';
+    }
+
+    // Parse color
+    Color color = const Color(0xFFFFD700);
+    if (backup.color != null) {
+      try {
+        final hexColor = backup.color!.replaceAll('#', '');
+        color = Color(int.parse('FF$hexColor', radix: 16));
+      } catch (e) {
+        color = const Color(0xFFFFD700);
+      }
+    }
+
+    return Habit(
+      id: backup.id,
+      name: backup.title,
+      icon: icon,
+      iconName: iconName,
+      color: color,
+      checkedDates: backup.toDateTimeSet(),
+    );
+  }
+
+  // Parse icon name to IconData
+  static IconData _parseIconName(String iconName) {
+    final iconMap = {
+      'shower_rounded': Icons.shower_rounded,
+      'pets_rounded': Icons.pets_rounded,
+      'menu_book_rounded': Icons.menu_book_rounded,
+      'fitness_center_rounded': Icons.fitness_center_rounded,
+      'check_circle_rounded': Icons.check_circle_rounded,
+    };
+    return iconMap[iconName] ?? Icons.check_circle_rounded;
+  }
 }
 
 // 习惯列表页面
@@ -68,32 +132,153 @@ class HabitListPage extends StatefulWidget {
 }
 
 class _HabitListPageState extends State<HabitListPage> {
-  // 习惯列表数据
-  final List<Habit> habits = [
-    Habit(
-      id: '1',
-      name: '洗澡',
-      icon: Icons.shower_rounded,
-    ),
-    Habit(
-      id: '2',
-      name: '给猫咪铲屎',
-      icon: Icons.pets_rounded,
-    ),
-    Habit(
-      id: '3',
-      name: '阅读 30 分钟',
-      icon: Icons.menu_book_rounded,
-    ),
-    Habit(
-      id: '4',
-      name: '运动健身',
-      icon: Icons.fitness_center_rounded,
-    ),
-  ];
+  List<Habit> habits = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHabits();
+  }
+
+  // 加载习惯数据
+  Future<void> _loadHabits() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final backup = await StorageService.loadHabits();
+      if (backup != null && backup.habits.isNotEmpty) {
+        setState(() {
+          habits = backup.habits.map((h) => Habit.fromBackup(h)).toList();
+          _isLoading = false;
+        });
+      } else {
+        // 使用默认习惯
+        setState(() {
+          habits = _getDefaultHabits();
+          _isLoading = false;
+        });
+        // 保存默认习惯
+        await _saveHabits();
+      }
+    } catch (e) {
+      print('Failed to load habits: $e');
+      setState(() {
+        habits = _getDefaultHabits();
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 获取默认习惯
+  List<Habit> _getDefaultHabits() {
+    return [
+      Habit(
+        id: 'habit_${DateTime.now().millisecondsSinceEpoch}',
+        name: '洗澡',
+        icon: Icons.shower_rounded,
+        iconName: 'shower_rounded',
+        color: const Color(0xFFFFD700),
+      ),
+      Habit(
+        id: 'habit_${DateTime.now().millisecondsSinceEpoch + 1}',
+        name: '给猫咪铲屎',
+        icon: Icons.pets_rounded,
+        iconName: 'pets_rounded',
+        color: const Color(0xFFFF8C00),
+      ),
+      Habit(
+        id: 'habit_${DateTime.now().millisecondsSinceEpoch + 2}',
+        name: '阅读 30 分钟',
+        icon: Icons.menu_book_rounded,
+        iconName: 'menu_book_rounded',
+        color: const Color(0xFF4CAF50),
+      ),
+      Habit(
+        id: 'habit_${DateTime.now().millisecondsSinceEpoch + 3}',
+        name: '运动健身',
+        icon: Icons.fitness_center_rounded,
+        iconName: 'fitness_center_rounded',
+        color: const Color(0xFF2196F3),
+      ),
+    ];
+  }
+
+  // 保存习惯数据
+  Future<void> _saveHabits() async {
+    try {
+      final backup = BackupV1(
+        exportedAt: DateTime.now(),
+        habits: habits.map((h) => h.toBackup()).toList(),
+      );
+      await StorageService.saveHabits(backup);
+    } catch (e) {
+      print('Failed to save habits: $e');
+    }
+  }
+
+  // 导出备份
+  Future<void> _exportBackup() async {
+    try {
+      final backup = BackupV1(
+        exportedAt: DateTime.now(),
+        habits: habits.map((h) => h.toBackup()).toList(),
+      );
+      await BackupService.exportBackup(backup);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('备份导出成功！')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: $e')),
+        );
+      }
+    }
+  }
+
+  // 导入备份
+  Future<void> _importBackup() async {
+    try {
+      final backup = await BackupService.importBackup();
+      setState(() {
+        habits = backup.habits.map((h) => Habit.fromBackup(h)).toList();
+      });
+      await _saveHabits();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('备份导入成功！')),
+        );
+      }
+    } on FormatException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导入失败: ${e.message}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导入失败: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       body: Stack(
         children: [
@@ -110,31 +295,55 @@ class _HabitListPageState extends State<HabitListPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _LuxuryGlassHeader(),
+                  // 头部带设置按钮
+                  Row(
+                    children: [
+                      Expanded(child: const _LuxuryGlassHeader()),
+                      const SizedBox(width: 12),
+                      _SettingsButton(
+                        onExport: _exportBackup,
+                        onImport: _importBackup,
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 32),
                   Expanded(
-                    child: ListView.separated(
-                      itemCount: habits.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 20),
-                      itemBuilder: (context, index) {
-                        return _HabitCard(
-                          habit: habits[index],
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => HabitDetailPage(
-                                  habit: habits[index],
-                                  onUpdate: () {
-                                    setState(() {});
-                                  },
-                                ),
+                    child: habits.isEmpty
+                        ? Center(
+                            child: Text(
+                              '暂无习惯，点击右下角添加',
+                              style: GoogleFonts.notoSansSc(
+                                color: Colors.brown[700],
+                                fontSize: 18,
                               ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: habits.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 20),
+                            itemBuilder: (context, index) {
+                              return _HabitCard(
+                                habit: habits[index],
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => HabitDetailPage(
+                                        habit: habits[index],
+                                        onUpdate: () {
+                                          setState(() {});
+                                          _saveHabits();
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                  setState(() {});
+                                  _saveHabits();
+                                },
+                              );
+                            },
+                          ),
                   ),
                 ],
               ),
@@ -143,6 +352,75 @@ class _HabitListPageState extends State<HabitListPage> {
         ],
       ),
       floatingActionButton: const _LuxuryAddButton(),
+    );
+  }
+}
+
+// 设置按钮
+class _SettingsButton extends StatelessWidget {
+  final VoidCallback onExport;
+  final VoidCallback onImport;
+
+  const _SettingsButton({
+    required this.onExport,
+    required this.onImport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: Colors.white.withOpacity(0.15),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: PopupMenuButton<String>(
+            icon: Icon(Icons.settings_rounded, color: Colors.brown[900]),
+            onSelected: (value) {
+              if (value == 'export') {
+                onExport();
+              } else if (value == 'import') {
+                onImport();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'export',
+                child: Row(
+                  children: [
+                    Icon(Icons.download_rounded, color: Colors.brown[900]),
+                    const SizedBox(width: 12),
+                    Text(
+                      '导出备份',
+                      style: GoogleFonts.notoSansSc(fontSize: 18),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'import',
+                child: Row(
+                  children: [
+                    Icon(Icons.upload_rounded, color: Colors.brown[900]),
+                    const SizedBox(width: 12),
+                    Text(
+                      '导入备份',
+                      style: GoogleFonts.notoSansSc(fontSize: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -201,17 +479,17 @@ class _HabitCard extends StatelessWidget {
                         color: Colors.white.withOpacity(0.5),
                         width: 2,
                       ),
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         colors: [
-                          Color(0xFFFFD700),
-                          Color(0xFFFF8C00),
+                          habit.color,
+                          habit.color.withOpacity(0.7),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFFD700).withOpacity(0.3),
+                          color: habit.color.withOpacity(0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -359,10 +637,10 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      gradient: const LinearGradient(
+                                      gradient: LinearGradient(
                                         colors: [
-                                          Color(0xFFFFD700),
-                                          Color(0xFFFF8C00),
+                                          widget.habit.color,
+                                          widget.habit.color.withOpacity(0.7),
                                         ],
                                       ),
                                     ),
