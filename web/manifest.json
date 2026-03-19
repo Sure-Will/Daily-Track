@@ -1,11 +1,11 @@
 {
-    "name": "daily_routine",
-    "short_name": "daily_routine",
+    "name": "每日追踪",
+    "short_name": "每日追踪",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Every day counts.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
