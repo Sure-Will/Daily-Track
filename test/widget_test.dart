@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:daily_routine/main.dart';
-import 'package:daily_routine/models/habit.dart';
+import 'package:daily_track/main.dart';
+import 'package:daily_track/models/habit.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

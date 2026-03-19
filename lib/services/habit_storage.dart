@@ -7,11 +7,12 @@ import '../models/habit.dart';
 class HabitStorage {
   HabitStorage();
 
-  static const _storageKey = 'daily_routine_habits_v1';
+  static const _storageKey = 'daily_track_habits_v1';
+  static const _legacyStorageKey = 'daily_routine_habits_v1';
 
   Future<List<Habit>> loadHabits() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
+    final raw = prefs.getString(_storageKey) ?? prefs.getString(_legacyStorageKey);
 
     if (raw == null || raw.isEmpty) {
       final defaults = _defaultHabits();
