@@ -9,11 +9,7 @@ class Habit {
   final String title;
   final List<String> completedDates;
 
-  Habit copyWith({
-    String? id,
-    String? title,
-    List<String>? completedDates,
-  }) {
+  Habit copyWith({String? id, String? title, List<String>? completedDates}) {
     return Habit(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -40,17 +36,12 @@ class Habit {
   }
 
   int completedCountInMonth(DateTime date) {
-    final prefix =
-        '${date.year}-${date.month.toString().padLeft(2, '0')}-';
+    final prefix = '${date.year}-${date.month.toString().padLeft(2, '0')}-';
     return completedDates.where((item) => item.startsWith(prefix)).length;
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'completedDates': completedDates,
-    };
+    return {'id': id, 'title': title, 'completedDates': completedDates};
   }
 
   factory Habit.fromJson(Map<String, dynamic> json) {
@@ -60,7 +51,8 @@ class Habit {
         : _migrateLegacyProgress(json['progress']);
 
     return Habit(
-      id: json['id'] as String? ??
+      id:
+          json['id'] as String? ??
           DateTime.now().microsecondsSinceEpoch.toString(),
       title: json['title'] as String? ?? '未命名习惯',
       completedDates: migratedDates,
@@ -72,13 +64,14 @@ class Habit {
       return const <String>[];
     }
 
-    final values = rawCompletedDates
-        .whereType<String>()
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final values =
+        rawCompletedDates
+            .whereType<String>()
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
 
     return values;
   }

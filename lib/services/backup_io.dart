@@ -1,5 +1,6 @@
 import 'backup_io_stub.dart'
-    if (dart.library.html) 'backup_io_web.dart' as backup_io;
+    if (dart.library.html) 'backup_io_web.dart'
+    as backup_io;
 
 Future<void> exportBackupFile({
   required String fileName,

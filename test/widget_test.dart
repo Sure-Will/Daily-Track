@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,31 +12,56 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('renders the calendar-based habit dashboard', (
+  testWidgets('renders the habit-first dashboard and per-habit calendar', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const DailyRoutineApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('记录日历'), findsOneWidget);
+    expect(find.text('今日习惯'), findsOneWidget);
+    expect(find.text('添加习惯'), findsOneWidget);
+    expect(find.text('设置'), findsOneWidget);
+    expect(find.text('导入备份'), findsNothing);
+    expect(find.text('导出备份'), findsNothing);
+
+    expect(find.text('健身'), findsOneWidget);
+    expect(find.text('早起 6:30'), findsNothing);
+    expect(find.text('阅读 30 分钟'), findsNothing);
+    expect(find.text('运动 20 分钟'), findsNothing);
+    expect(find.text('不刷短视频'), findsNothing);
+
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('主题配色'), findsOneWidget);
+    expect(find.text('活力橙'), findsOneWidget);
+    expect(find.text('当前默认'), findsOneWidget);
     expect(find.text('导入备份'), findsOneWidget);
     expect(find.text('导出备份'), findsOneWidget);
-    expect(find.text('添加习惯'), findsOneWidget);
 
-    expect(find.text('早起 6:30'), findsOneWidget);
-    expect(find.text('阅读 30 分钟'), findsOneWidget);
-    expect(find.text('运动 20 分钟'), findsOneWidget);
-    expect(find.text('不刷短视频'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
 
-    final todayKey = ValueKey('calendar-day-${Habit.dateKeyFor(DateTime.now())}');
+    final today = DateTime.now();
+    final todayKey = ValueKey('calendar-day-${Habit.dateKeyFor(today)}');
+
+    await tester.tap(find.text('健身'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('${today.year} 年 ${today.month} 月'), findsOneWidget);
     expect(find.byKey(todayKey), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(const ValueKey('habit-toggle-wake-up')));
+    await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('habit-toggle-wake-up')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('habit-toggle-fitness')),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('已完成'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('habit-toggle-fitness')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('今天已完成'), findsOneWidget);
   });
 }

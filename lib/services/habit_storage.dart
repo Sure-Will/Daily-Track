@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'habit_bridge.dart';
 import '../models/habit.dart';
 
 class HabitStorage {
@@ -10,9 +11,34 @@ class HabitStorage {
   static const _storageKey = 'daily_track_habits_v1';
   static const _legacyStorageKey = 'daily_routine_habits_v1';
 
+  bool _bridgeConnected = false;
+  String? _bridgeFilePath;
+  DateTime? _bridgeSavedAt;
+
+  bool get bridgeConnected => _bridgeConnected;
+  String? get bridgeFilePath => _bridgeFilePath;
+  DateTime? get bridgeSavedAt => _bridgeSavedAt;
+
   Future<List<Habit>> loadHabits() async {
+    final bridgeSnapshot = await loadFromBridge();
+    if (bridgeSnapshot != null) {
+      _bridgeConnected = true;
+      _bridgeFilePath = bridgeSnapshot.filePath;
+      _bridgeSavedAt = bridgeSnapshot.savedAt;
+      final habits = bridgeSnapshot.habits.isEmpty
+          ? _defaultHabits()
+          : bridgeSnapshot.habits;
+      await _saveBrowserCache(habits);
+      return habits;
+    }
+
+    _bridgeConnected = false;
+    _bridgeFilePath = null;
+    _bridgeSavedAt = null;
+
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey) ?? prefs.getString(_legacyStorageKey);
+    final raw =
+        prefs.getString(_storageKey) ?? prefs.getString(_legacyStorageKey);
 
     if (raw == null || raw.isEmpty) {
       final defaults = _defaultHabits();
@@ -34,6 +60,12 @@ class HabitStorage {
         return defaults;
       }
 
+      if (_isUntouchedOldDefaultSet(habits)) {
+        final defaults = _defaultHabits();
+        await saveHabits(defaults);
+        return defaults;
+      }
+
       return habits;
     } catch (_) {
       final defaults = _defaultHabits();
@@ -43,6 +75,21 @@ class HabitStorage {
   }
 
   Future<void> saveHabits(List<Habit> habits) async {
+    final bridgeSnapshot = await saveToBridge(habits);
+    if (bridgeSnapshot != null) {
+      _bridgeConnected = true;
+      _bridgeFilePath = bridgeSnapshot.filePath;
+      _bridgeSavedAt = bridgeSnapshot.savedAt;
+    } else {
+      _bridgeConnected = false;
+      _bridgeFilePath = null;
+      _bridgeSavedAt = null;
+    }
+
+    await _saveBrowserCache(habits);
+  }
+
+  Future<void> _saveBrowserCache(List<Habit> habits) async {
     final prefs = await SharedPreferences.getInstance();
     final payload = {
       'version': 2,
@@ -85,11 +132,24 @@ class HabitStorage {
   }
 
   List<Habit> _defaultHabits() {
-    return const <Habit>[
-      Habit(id: 'wake-up', title: '早起 6:30'),
-      Habit(id: 'reading', title: '阅读 30 分钟'),
-      Habit(id: 'exercise', title: '运动 20 分钟'),
-      Habit(id: 'no-shorts', title: '不刷短视频'),
-    ];
+    return const <Habit>[Habit(id: 'fitness', title: '健身')];
+  }
+
+  bool _isUntouchedOldDefaultSet(List<Habit> habits) {
+    const oldDefaultIds = <String>{
+      'wake-up',
+      'reading',
+      'exercise',
+      'no-shorts',
+    };
+
+    if (habits.length != oldDefaultIds.length) {
+      return false;
+    }
+
+    return habits.every(
+      (habit) =>
+          oldDefaultIds.contains(habit.id) && habit.completedDates.isEmpty,
+    );
   }
 }

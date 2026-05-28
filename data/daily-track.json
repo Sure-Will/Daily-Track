@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "savedAt": "2026-05-28T21:09:15.486331",
+  "filePath": "/Users/sure/repos/Daily-Track/data/daily-track.json",
+  "habits": [
+    {
+      "id": "fitness",
+      "title": "健身",
+      "completedDates": [
+        "2026-05-28"
+      ]
+    }
+  ]
+}

@@ -1,10 +1,256 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/habit.dart';
 import 'services/backup_io.dart';
 import 'services/habit_storage.dart';
+
+const _ink = Color(0xFF431407);
+const _warmCanvas = Color(0xFFFFF7ED);
+const _warmPanel = Color(0xFFFFEDD5);
+const _brandOrange = Color(0xFFF97316);
+const _brandOrangeDark = Color(0xFFEA580C);
+const _brandAmber = Color(0xFFF59E0B);
+const _themePreferenceKey = 'daily_track_theme';
+
+enum DailyThemeChoice { ember, pureLight, deepDark }
+
+class DailyThemeSpec {
+  const DailyThemeSpec({
+    required this.choice,
+    required this.name,
+    required this.caption,
+    required this.brightness,
+    required this.seed,
+    required this.accent,
+    required this.accentStrong,
+    required this.accentAlt,
+    required this.ink,
+    required this.inkMuted,
+    required this.canvas,
+    required this.panel,
+    required this.panelAlt,
+    required this.backgroundColors,
+    required this.washColors,
+    required this.onBackground,
+    required this.onBackgroundMuted,
+    required this.onBackgroundSoft,
+    required this.glassTop,
+    required this.glassBottom,
+    required this.glassBorder,
+    required this.glassShadow,
+    required this.glassControl,
+    required this.cardControl,
+    required this.chipSurface,
+    required this.chipBorder,
+    required this.dayCellSurface,
+    required this.dayCellBorder,
+  });
+
+  final DailyThemeChoice choice;
+  final String name;
+  final String caption;
+  final Brightness brightness;
+  final Color seed;
+  final Color accent;
+  final Color accentStrong;
+  final Color accentAlt;
+  final Color ink;
+  final Color inkMuted;
+  final Color canvas;
+  final Color panel;
+  final Color panelAlt;
+  final List<Color> backgroundColors;
+  final List<List<Color>> washColors;
+  final Color onBackground;
+  final Color onBackgroundMuted;
+  final Color onBackgroundSoft;
+  final Color glassTop;
+  final Color glassBottom;
+  final Color glassBorder;
+  final Color glassShadow;
+  final Color glassControl;
+  final Color cardControl;
+  final Color chipSurface;
+  final Color chipBorder;
+  final Color dayCellSurface;
+  final Color dayCellBorder;
+
+  ThemeData materialTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: brightness,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: seed,
+        brightness: brightness,
+      ),
+      fontFamily: 'SF Pro',
+      scaffoldBackgroundColor: backgroundColors.last,
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: accentStrong),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        floatingLabelStyle: TextStyle(color: accentStrong),
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: accentStrong, width: 2),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: brightness == Brightness.dark
+            ? const Color(0xFF111827)
+            : const Color(0xFF172033),
+        contentTextStyle: const TextStyle(color: Colors.white),
+      ),
+    );
+  }
+}
+
+DailyThemeSpec _themeFor(DailyThemeChoice choice) {
+  return switch (choice) {
+    DailyThemeChoice.ember => const DailyThemeSpec(
+      choice: DailyThemeChoice.ember,
+      name: '活力橙',
+      caption: '当前默认',
+      brightness: Brightness.light,
+      seed: _brandOrange,
+      accent: _brandOrange,
+      accentStrong: _brandOrangeDark,
+      accentAlt: _brandAmber,
+      ink: _ink,
+      inkMuted: Color(0xA3431407),
+      canvas: _warmCanvas,
+      panel: _warmPanel,
+      panelAlt: Color(0xFFFFFFFF),
+      backgroundColors: [
+        Color(0xFF2A120B),
+        Color(0xFF7C2D12),
+        Color(0xFFF97316),
+      ],
+      washColors: [
+        [Color(0x55FDBA74), Color(0x00FDBA74)],
+        [Color(0x55FB923C), Color(0x00FB923C)],
+        [Color(0x44FCA5A5), Color(0x00FCA5A5)],
+      ],
+      onBackground: Colors.white,
+      onBackgroundMuted: Color(0xB3FFFFFF),
+      onBackgroundSoft: Color(0x99FFFFFF),
+      glassTop: Color(0x26FFFFFF),
+      glassBottom: Color(0x0CFFFFFF),
+      glassBorder: Color(0x29FFFFFF),
+      glassShadow: Color(0x26000000),
+      glassControl: Color(0x24FFFFFF),
+      cardControl: Color(0x14FFFFFF),
+      chipSurface: _warmPanel,
+      chipBorder: Color(0xFFFFD7AA),
+      dayCellSurface: Color(0xB8FFFFFF),
+      dayCellBorder: Color(0xFFFFD7AA),
+    ),
+    DailyThemeChoice.pureLight => const DailyThemeSpec(
+      choice: DailyThemeChoice.pureLight,
+      name: '纯亮',
+      caption: '白瓷、银灰、清透蓝',
+      brightness: Brightness.light,
+      seed: Color(0xFF2563EB),
+      accent: Color(0xFF2563EB),
+      accentStrong: Color(0xFF1D4ED8),
+      accentAlt: Color(0xFF06B6D4),
+      ink: Color(0xFF111827),
+      inkMuted: Color(0xA3111827),
+      canvas: Color(0xFFF8FAFC),
+      panel: Color(0xFFEFF6FF),
+      panelAlt: Colors.white,
+      backgroundColors: [
+        Color(0xFFFFFFFF),
+        Color(0xFFF8FAFC),
+        Color(0xFFEFF6FF),
+      ],
+      washColors: [
+        [Color(0x44BFDBFE), Color(0x00BFDBFE)],
+        [Color(0x38A7F3D0), Color(0x00A7F3D0)],
+        [Color(0x30C4B5FD), Color(0x00C4B5FD)],
+      ],
+      onBackground: Color(0xFF111827),
+      onBackgroundMuted: Color(0xB3111827),
+      onBackgroundSoft: Color(0x8A111827),
+      glassTop: Color(0xCCFFFFFF),
+      glassBottom: Color(0x66FFFFFF),
+      glassBorder: Color(0xBFE2E8F0),
+      glassShadow: Color(0x1F0F172A),
+      glassControl: Color(0xCCFFFFFF),
+      cardControl: Color(0x80FFFFFF),
+      chipSurface: Color(0xFFEFF6FF),
+      chipBorder: Color(0xFFBFDBFE),
+      dayCellSurface: Color(0xE6FFFFFF),
+      dayCellBorder: Color(0xFFD8E2EF),
+    ),
+    DailyThemeChoice.deepDark => const DailyThemeSpec(
+      choice: DailyThemeChoice.deepDark,
+      name: '深色',
+      caption: '墨黑、石墨、极光青',
+      brightness: Brightness.dark,
+      seed: Color(0xFF22D3EE),
+      accent: Color(0xFF22D3EE),
+      accentStrong: Color(0xFF67E8F9),
+      accentAlt: Color(0xFFA78BFA),
+      ink: Color(0xFFE5E7EB),
+      inkMuted: Color(0xA3E5E7EB),
+      canvas: Color(0xFF0B1120),
+      panel: Color(0xFF111827),
+      panelAlt: Color(0xFF172033),
+      backgroundColors: [
+        Color(0xFF020617),
+        Color(0xFF0B1120),
+        Color(0xFF111827),
+      ],
+      washColors: [
+        [Color(0x3322D3EE), Color(0x0022D3EE)],
+        [Color(0x2EA78BFA), Color(0x00A78BFA)],
+        [Color(0x244ADE80), Color(0x004ADE80)],
+      ],
+      onBackground: Color(0xFFF8FAFC),
+      onBackgroundMuted: Color(0xB3F8FAFC),
+      onBackgroundSoft: Color(0x8AF8FAFC),
+      glassTop: Color(0x2EFFFFFF),
+      glassBottom: Color(0x1015B8A6),
+      glassBorder: Color(0x38FFFFFF),
+      glassShadow: Color(0x66000000),
+      glassControl: Color(0x24FFFFFF),
+      cardControl: Color(0x14FFFFFF),
+      chipSurface: Color(0xFF172033),
+      chipBorder: Color(0xFF273449),
+      dayCellSurface: Color(0xFF111827),
+      dayCellBorder: Color(0xFF263244),
+    ),
+  };
+}
+
+class _DailyThemeScope extends InheritedWidget {
+  const _DailyThemeScope({required this.spec, required super.child});
+
+  final DailyThemeSpec spec;
+
+  static DailyThemeSpec of(BuildContext context) {
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<_DailyThemeScope>();
+    return scope?.spec ?? _themeFor(DailyThemeChoice.ember);
+  }
+
+  @override
+  bool updateShouldNotify(_DailyThemeScope oldWidget) {
+    return oldWidget.spec.choice != spec.choice;
+  }
+}
 
 void main() {
   runApp(const DailyRoutineApp());
@@ -33,25 +279,83 @@ String _selectedDateLabel(DateTime date) {
   return '${date.month} 月 ${date.day} 日 周${_weekdayLabel(date.weekday)}';
 }
 
-class DailyRoutineApp extends StatelessWidget {
+class DailyRoutineApp extends StatefulWidget {
   const DailyRoutineApp({super.key});
 
   @override
+  State<DailyRoutineApp> createState() => _DailyRoutineAppState();
+}
+
+class _DailyRoutineAppState extends State<DailyRoutineApp> {
+  DailyThemeChoice _themeChoice = DailyThemeChoice.ember;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThemeChoice();
+  }
+
+  Future<void> _loadThemeChoice() async {
+    final preferences = await SharedPreferences.getInstance();
+    final savedKey = preferences.getString(_themePreferenceKey);
+    final savedChoice = DailyThemeChoice.values
+        .where((choice) => choice.name == savedKey)
+        .firstOrNull;
+
+    if (savedChoice == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _themeChoice = savedChoice;
+    });
+  }
+
+  Future<void> _changeTheme(DailyThemeChoice choice) async {
+    setState(() {
+      _themeChoice = choice;
+    });
+
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_themePreferenceKey, choice.name);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '每日追踪',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'SF Pro',
+    final spec = _themeFor(_themeChoice);
+
+    return _DailyThemeScope(
+      spec: spec,
+      child: MaterialApp(
+        title: '每日追踪',
+        debugShowCheckedModeBanner: false,
+        builder: (context, child) {
+          return ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
+        theme: spec.materialTheme(),
+        home: DailyHomePage(
+          selectedTheme: _themeChoice,
+          onThemeChanged: _changeTheme,
+        ),
       ),
-      home: const DailyHomePage(),
     );
   }
 }
 
 class DailyHomePage extends StatefulWidget {
-  const DailyHomePage({super.key});
+  const DailyHomePage({
+    super.key,
+    required this.selectedTheme,
+    required this.onThemeChanged,
+  });
+
+  final DailyThemeChoice selectedTheme;
+  final ValueChanged<DailyThemeChoice> onThemeChanged;
 
   @override
   State<DailyHomePage> createState() => _DailyHomePageState();
@@ -59,9 +363,6 @@ class DailyHomePage extends StatefulWidget {
 
 class _DailyHomePageState extends State<DailyHomePage> {
   final HabitStorage _storage = HabitStorage();
-
-  late DateTime _selectedDate;
-  late DateTime _displayMonth;
 
   List<Habit> _habits = const <Habit>[];
   bool _isLoading = true;
@@ -72,10 +373,6 @@ class _DailyHomePageState extends State<DailyHomePage> {
   @override
   void initState() {
     super.initState();
-
-    final today = _dateOnly(DateTime.now());
-    _selectedDate = today;
-    _displayMonth = DateTime(today.year, today.month);
     _loadHabits();
   }
 
@@ -113,30 +410,6 @@ class _DailyHomePageState extends State<DailyHomePage> {
     }
   }
 
-  void _selectDate(DateTime date) {
-    setState(() {
-      _selectedDate = _dateOnly(date);
-      _displayMonth = DateTime(date.year, date.month);
-    });
-  }
-
-  void _changeMonth(int offset) {
-    final nextMonth = DateTime(_displayMonth.year, _displayMonth.month + offset);
-    final normalizedNextMonth = DateTime(nextMonth.year, nextMonth.month);
-    final today = _dateOnly(DateTime.now());
-
-    setState(() {
-      _displayMonth = normalizedNextMonth;
-      if (_selectedDate.year != normalizedNextMonth.year ||
-          _selectedDate.month != normalizedNextMonth.month) {
-        _selectedDate = today.year == normalizedNextMonth.year &&
-                today.month == normalizedNextMonth.month
-            ? today
-            : normalizedNextMonth;
-      }
-    });
-  }
-
   Future<void> _addHabit() async {
     final title = await _openHabitDialog();
     if (title == null || title.isEmpty) {
@@ -145,10 +418,7 @@ class _DailyHomePageState extends State<DailyHomePage> {
 
     final nextHabits = <Habit>[
       ..._habits,
-      Habit(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        title: title,
-      ),
+      Habit(id: DateTime.now().microsecondsSinceEpoch.toString(), title: title),
     ];
 
     await _persistHabits(nextHabits, successMessage: '已添加习惯');
@@ -168,7 +438,8 @@ class _DailyHomePageState extends State<DailyHomePage> {
   }
 
   Future<void> _deleteHabit(Habit habit) async {
-    final shouldDelete = await showDialog<bool>(
+    final shouldDelete =
+        await showDialog<bool>(
           context: context,
           builder: (dialogContext) {
             return AlertDialog(
@@ -193,24 +464,56 @@ class _DailyHomePageState extends State<DailyHomePage> {
       return;
     }
 
-    final nextHabits =
-        _habits.where((item) => item.id != habit.id).toList(growable: false);
+    final nextHabits = _habits
+        .where((item) => item.id != habit.id)
+        .toList(growable: false);
     await _persistHabits(nextHabits, successMessage: '已删除习惯');
   }
 
-  Future<void> _toggleHabitOnSelectedDate(Habit habit) async {
+  Future<Habit> _toggleHabitOnDate(
+    Habit habit,
+    DateTime date, {
+    bool showMessage = true,
+  }) async {
+    final targetDate = _dateOnly(date);
+    final currentHabit = _habits.firstWhere(
+      (item) => item.id == habit.id,
+      orElse: () => habit,
+    );
+    final updatedHabit = currentHabit.toggleCompletionOn(targetDate);
     final nextHabits = _habits
-        .map(
-          (item) => item.id == habit.id
-              ? item.toggleCompletionOn(_selectedDate)
-              : item,
-        )
+        .map((item) => item.id == habit.id ? updatedHabit : item)
         .toList();
 
-    final nextStatus = !habit.isCompletedOn(_selectedDate);
+    final nextStatus = updatedHabit.isCompletedOn(targetDate);
     await _persistHabits(
       nextHabits,
-      successMessage: nextStatus ? '已记录完成' : '已取消完成',
+      successMessage: showMessage ? (nextStatus ? '已记录完成' : '已取消完成') : null,
+    );
+
+    return updatedHabit;
+  }
+
+  Future<void> _toggleHabitToday(Habit habit) async {
+    await _toggleHabitOnDate(habit, DateTime.now());
+  }
+
+  Future<void> _openHabitCalendar(Habit habit) async {
+    final latestHabit = _habits.firstWhere(
+      (item) => item.id == habit.id,
+      orElse: () => habit,
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return _HabitCalendarDialog(
+          habit: latestHabit,
+          onToggleDate: (targetHabit, date) {
+            return _toggleHabitOnDate(targetHabit, date, showMessage: false);
+          },
+        );
+      },
     );
   }
 
@@ -285,31 +588,80 @@ class _DailyHomePageState extends State<DailyHomePage> {
     final result = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(initialTitle == null ? '添加习惯' : '编辑习惯'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: '习惯名称',
-              hintText: '例如：阅读 30 分钟',
-            ),
-            onSubmitted: (value) {
-              Navigator.of(dialogContext).pop(value.trim());
-            },
+        final theme = _DailyThemeScope.of(dialogContext);
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 24,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('取消'),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+              decoration: BoxDecoration(
+                color: theme.canvas,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.glassShadow,
+                    blurRadius: 36,
+                    offset: Offset(0, 20),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    initialTitle == null ? '添加习惯' : '编辑习惯',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: theme.ink,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    cursorColor: theme.accentStrong,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: theme.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: '习惯名称',
+                      hintText: '例如：阅读 30 分钟',
+                    ),
+                    onSubmitted: (value) {
+                      Navigator.of(dialogContext).pop(value.trim());
+                    },
+                  ),
+                  const SizedBox(height: 26),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const Text('取消'),
+                      ),
+                      const SizedBox(width: 12),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(
+                            dialogContext,
+                          ).pop(controller.text.trim());
+                        },
+                        child: const Text('保存'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(controller.text.trim());
-              },
-              child: const Text('保存'),
-            ),
-          ],
+          ),
         );
       },
     );
@@ -325,72 +677,93 @@ class _DailyHomePageState extends State<DailyHomePage> {
   }
 
   String _savedLabel() {
-    if (_lastSavedAt == null) {
-      return '自动保存在当前浏览器';
+    final savedAt = _storage.bridgeSavedAt ?? _lastSavedAt;
+    final target = _storage.bridgeConnected ? '本地 JSON' : '浏览器本地';
+
+    if (savedAt == null) {
+      return '自动保存到$target';
     }
 
-    final hour = _lastSavedAt!.hour.toString().padLeft(2, '0');
-    final minute = _lastSavedAt!.minute.toString().padLeft(2, '0');
-    return '自动保存在当前浏览器 · 最后保存 $hour:$minute';
+    final hour = savedAt.hour.toString().padLeft(2, '0');
+    final minute = savedAt.minute.toString().padLeft(2, '0');
+    return '自动保存到$target · 最后保存 $hour:$minute';
+  }
+
+  String _syncTitle() {
+    return _storage.bridgeConnected ? '本地 JSON 已连接' : '浏览器本地模式';
+  }
+
+  String _syncDetail() {
+    return _storage.bridgeConnected
+        ? (_storage.bridgeFilePath ?? 'data/daily-track.json')
+        : '启动 dart run bin/daily_track_bridge.dart 后自动同步';
+  }
+
+  Future<void> _openSettings({
+    required int completedCount,
+    required int totalCount,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return _SettingsDialog(
+          completedCount: completedCount,
+          totalCount: totalCount,
+          savedLabel: _savedLabel(),
+          syncTitle: _syncTitle(),
+          syncDetail: _syncDetail(),
+          isBridgeConnected: _storage.bridgeConnected,
+          isImporting: _isImporting,
+          isExporting: _isExporting,
+          selectedTheme: widget.selectedTheme,
+          onThemeChanged: widget.onThemeChanged,
+          onImport: () {
+            Navigator.of(dialogContext).pop();
+            _importHabits();
+          },
+          onExport: () {
+            Navigator.of(dialogContext).pop();
+            _exportHabits();
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final today = _dateOnly(DateTime.now());
     final completedCount = _habits
-        .where((habit) => habit.isCompletedOn(_selectedDate))
+        .where((habit) => habit.isCompletedOn(today))
         .length;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: _GlassFloatingButton(
-        onPressed: _addHabit,
-      ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF2A120B),
-              Color(0xFF7C2D12),
-              Color(0xFFF97316),
-            ],
+            colors: theme.backgroundColors,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: Stack(
           children: [
-            const Positioned(
+            Positioned(
               top: -110,
               left: -70,
-              child: _AmbientGlow(
-                size: 320,
-                colors: [
-                  Color(0x55FDBA74),
-                  Color(0x00FDBA74),
-                ],
-              ),
+              child: _AmbientGlow(size: 320, colors: theme.washColors[0]),
             ),
-            const Positioned(
+            Positioned(
               right: -90,
               top: 90,
-              child: _AmbientGlow(
-                size: 300,
-                colors: [
-                  Color(0x55FB923C),
-                  Color(0x00FB923C),
-                ],
-              ),
+              child: _AmbientGlow(size: 300, colors: theme.washColors[1]),
             ),
-            const Positioned(
+            Positioned(
               left: 70,
               bottom: -120,
-              child: _AmbientGlow(
-                size: 360,
-                colors: [
-                  Color(0x44FCA5A5),
-                  Color(0x00FCA5A5),
-                ],
-              ),
+              child: _AmbientGlow(size: 360, colors: theme.washColors[2]),
             ),
             SafeArea(
               child: Align(
@@ -400,78 +773,55 @@ class _DailyHomePageState extends State<DailyHomePage> {
                   child: LayoutBuilder(
                     builder: (context, constraints) {
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 112),
                         child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _Header(
-                                selectedDate: _selectedDate,
-                                completedCount: completedCount,
-                                totalCount: _habits.length,
-                                savedLabel: _savedLabel(),
+                              const _Header(),
+                              const SizedBox(height: 26),
+                              _SectionHeader(
+                                title: '今日习惯',
+                                detail:
+                                    '${_selectedDateLabel(today)} · $completedCount / ${_habits.length}',
                               ),
-                              const SizedBox(height: 18),
-                              _CalendarPanel(
-                                displayMonth: _displayMonth,
-                                selectedDate: _selectedDate,
-                                onSelectDate: _selectDate,
-                                onChangeMonth: _changeMonth,
-                              ),
-                              const SizedBox(height: 18),
-                              Wrap(
-                                spacing: 12,
-                                runSpacing: 12,
-                                children: [
-                                  _GlassToolbarButton(
-                                    label: '导入备份',
-                                    icon: Icons.file_open_outlined,
-                                    isBusy: _isImporting,
-                                    onPressed: _isImporting ? null : _importHabits,
-                                  ),
-                                  _GlassToolbarButton(
-                                    label: '导出备份',
-                                    icon: Icons.download_rounded,
-                                    isBusy: _isExporting,
-                                    onPressed: _isExporting ? null : _exportHabits,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 22),
+                              const SizedBox(height: 14),
                               AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 250),
                                 child: switch (_isLoading) {
                                   true => const Padding(
-                                      padding: EdgeInsets.only(top: 48),
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                        ),
-                                      ),
+                                    padding: EdgeInsets.only(top: 48),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
                                     ),
-                                  false when _habits.isEmpty => _EmptyState(
-                                      selectedDate: _selectedDate,
-                                    ),
+                                  ),
+                                  false when _habits.isEmpty =>
+                                    const _EmptyState(),
                                   _ => ListView.separated(
-                                      shrinkWrap: true,
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      itemCount: _habits.length,
-                                      separatorBuilder: (context, index) =>
-                                          const SizedBox(height: 16),
-                                      itemBuilder: (context, index) {
-                                        final habit = _habits[index];
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: _habits.length,
+                                    separatorBuilder: (context, index) =>
+                                        const SizedBox(height: 16),
+                                    itemBuilder: (context, index) {
+                                      final habit = _habits[index];
 
-                                        return GlassHabitCard(
-                                          habit: habit,
-                                          selectedDate: _selectedDate,
-                                          onToggle: () =>
-                                              _toggleHabitOnSelectedDate(habit),
-                                          onEdit: () => _editHabit(habit),
-                                          onDelete: () => _deleteHabit(habit),
-                                        );
-                                      },
-                                    ),
+                                      return GlassHabitCard(
+                                        habit: habit,
+                                        today: today,
+                                        onOpenCalendar: () =>
+                                            _openHabitCalendar(habit),
+                                        onToggleToday: () =>
+                                            _toggleHabitToday(habit),
+                                        onEdit: () => _editHabit(habit),
+                                        onDelete: () => _deleteHabit(habit),
+                                      );
+                                    },
+                                  ),
                                 },
                               ),
                             ],
@@ -483,6 +833,25 @@ class _DailyHomePageState extends State<DailyHomePage> {
                 ),
               ),
             ),
+            Positioned(
+              left: 20,
+              bottom: 20,
+              child: SafeArea(
+                child: _SettingsFloatingButton(
+                  onPressed: () => _openSettings(
+                    completedCount: completedCount,
+                    totalCount: _habits.length,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 20,
+              bottom: 20,
+              child: SafeArea(
+                child: _GlassFloatingButton(onPressed: _addHabit),
+              ),
+            ),
           ],
         ),
       ),
@@ -491,17 +860,7 @@ class _DailyHomePageState extends State<DailyHomePage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.selectedDate,
-    required this.completedCount,
-    required this.totalCount,
-    required this.savedLabel,
-  });
-
-  final DateTime selectedDate;
-  final int completedCount;
-  final int totalCount;
-  final String savedLabel;
+  const _Header();
 
   String _todayLabel() {
     final now = DateTime.now();
@@ -510,49 +869,236 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           _todayLabel(),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white70,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: theme.onBackgroundMuted),
         ),
         const SizedBox(height: 4),
         Text(
           '每日追踪',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+            color: theme.onBackground,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           'Every day counts.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white60,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: theme.onBackgroundSoft),
         ),
-        const SizedBox(height: 18),
-        _GlassPanel(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          borderRadius: 22,
-          child: Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            children: [
-              _InfoChip(
-                label:
-                    '${_selectedDateLabel(selectedDate)} · 已完成 $completedCount / $totalCount',
-              ),
-              _InfoChip(
-                label: savedLabel,
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.detail});
+
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: theme.onBackground,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          detail,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: theme.onBackgroundMuted,
+            fontWeight: FontWeight.w600,
+          ),
+          softWrap: true,
+        ),
+      ],
+    );
+  }
+}
+
+class _HabitCalendarDialog extends StatefulWidget {
+  const _HabitCalendarDialog({required this.habit, required this.onToggleDate});
+
+  final Habit habit;
+  final Future<Habit> Function(Habit habit, DateTime date) onToggleDate;
+
+  @override
+  State<_HabitCalendarDialog> createState() => _HabitCalendarDialogState();
+}
+
+class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
+  late Habit _habit;
+  late DateTime _displayMonth;
+  late DateTime _selectedDate;
+  String? _savingDateKey;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final today = _dateOnly(DateTime.now());
+    _habit = widget.habit;
+    _selectedDate = today;
+    _displayMonth = DateTime(today.year, today.month);
+  }
+
+  void _changeMonth(int offset) {
+    final nextMonth = DateTime(
+      _displayMonth.year,
+      _displayMonth.month + offset,
+    );
+    final normalizedNextMonth = DateTime(nextMonth.year, nextMonth.month);
+    final today = _dateOnly(DateTime.now());
+
+    setState(() {
+      _displayMonth = normalizedNextMonth;
+      if (_selectedDate.year != normalizedNextMonth.year ||
+          _selectedDate.month != normalizedNextMonth.month) {
+        _selectedDate =
+            today.year == normalizedNextMonth.year &&
+                today.month == normalizedNextMonth.month
+            ? today
+            : normalizedNextMonth;
+      }
+    });
+  }
+
+  Future<void> _toggleDate(DateTime date) async {
+    final normalizedDate = _dateOnly(date);
+    final key = Habit.dateKeyFor(normalizedDate);
+    setState(() {
+      _selectedDate = normalizedDate;
+      _savingDateKey = key;
+    });
+
+    final updatedHabit = await widget.onToggleDate(_habit, normalizedDate);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _habit = updatedHabit;
+      _savingDateKey = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final selectedIsCompleted = _habit.isCompletedOn(_selectedDate);
+    final completedThisMonth = _habit.completedCountInMonth(_displayMonth);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+          decoration: BoxDecoration(
+            color: theme.canvas,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: theme.glassShadow,
+                blurRadius: 42,
+                offset: Offset(0, 24),
               ),
             ],
           ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _habit.title,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: theme.ink,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${_selectedDateLabel(_selectedDate)} · ${selectedIsCompleted ? '已完成' : '未完成'}',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: theme.inkMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '关闭',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                      color: theme.accentStrong,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _WarmMetricChip(label: '本月完成 $completedThisMonth 天'),
+                    _WarmMetricChip(
+                      label: '累计记录 ${_habit.completedDates.length} 天',
+                    ),
+                    _WarmMetricChip(label: '点日期切换打卡'),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _CalendarPanel(
+                  displayMonth: _displayMonth,
+                  selectedDate: _selectedDate,
+                  habit: _habit,
+                  savingDateKey: _savingDateKey,
+                  onToggleDate: _toggleDate,
+                  onChangeMonth: _changeMonth,
+                ),
+                const SizedBox(height: 18),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('完成'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -561,21 +1107,28 @@ class _CalendarPanel extends StatelessWidget {
   const _CalendarPanel({
     required this.displayMonth,
     required this.selectedDate,
-    required this.onSelectDate,
+    required this.habit,
+    required this.savingDateKey,
+    required this.onToggleDate,
     required this.onChangeMonth,
   });
 
   final DateTime displayMonth;
   final DateTime selectedDate;
-  final ValueChanged<DateTime> onSelectDate;
+  final Habit habit;
+  final String? savingDateKey;
+  final ValueChanged<DateTime> onToggleDate;
   final ValueChanged<int> onChangeMonth;
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
     final firstDayOfMonth = DateTime(displayMonth.year, displayMonth.month, 1);
     final leadingEmptyCount = firstDayOfMonth.weekday - 1;
-    final daysInMonth =
-        DateUtils.getDaysInMonth(displayMonth.year, displayMonth.month);
+    final daysInMonth = DateUtils.getDaysInMonth(
+      displayMonth.year,
+      displayMonth.month,
+    );
     final today = _dateOnly(DateTime.now());
 
     final cells = <DateTime?>[
@@ -587,112 +1140,98 @@ class _CalendarPanel extends StatelessWidget {
     final trailingEmptyCount = (7 - cells.length % 7) % 7;
     cells.addAll(List<DateTime?>.filled(trailingEmptyCount, null));
 
-    return _GlassPanel(
-      borderRadius: 28,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '记录日历',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              _monthLabel(displayMonth),
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: theme.ink,
+                fontWeight: FontWeight.w800,
               ),
-              const Spacer(),
-              _MonthArrowButton(
-                icon: Icons.chevron_left_rounded,
-                onPressed: () => onChangeMonth(-1),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                _monthLabel(displayMonth),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(width: 8),
-              _MonthArrowButton(
-                icon: Icons.chevron_right_rounded,
-                onPressed: () => onChangeMonth(1),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: List<Widget>.generate(7, (index) {
-              return Expanded(
-                child: Center(
-                  child: Text(
-                    _weekdayLabel(index + 1),
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: Colors.white60,
-                          fontWeight: FontWeight.w600,
-                        ),
+            ),
+            const Spacer(),
+            _MonthArrowButton(
+              icon: Icons.chevron_left_rounded,
+              onPressed: () => onChangeMonth(-1),
+            ),
+            const SizedBox(width: 6),
+            _MonthArrowButton(
+              icon: Icons.chevron_right_rounded,
+              onPressed: () => onChangeMonth(1),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: List<Widget>.generate(7, (index) {
+            return Expanded(
+              child: Center(
+                child: Text(
+                  _weekdayLabel(index + 1),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: theme.inkMuted,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              );
-            }),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: cells.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.08,
           ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: cells.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1,
-            ),
-            itemBuilder: (context, index) {
-              final date = cells[index];
-              if (date == null) {
-                return const SizedBox.shrink();
-              }
+          itemBuilder: (context, index) {
+            final date = cells[index];
+            if (date == null) {
+              return const SizedBox.shrink();
+            }
 
-              return _CalendarDayCell(
-                key: ValueKey('calendar-day-${Habit.dateKeyFor(date)}'),
-                date: date,
-                isToday: _isSameDay(date, today),
-                isSelected: _isSameDay(date, selectedDate),
-                onTap: () => onSelectDate(date),
-              );
-            },
-          ),
-        ],
-      ),
+            return _CalendarDayCell(
+              key: ValueKey('calendar-day-${Habit.dateKeyFor(date)}'),
+              date: date,
+              isToday: _isSameDay(date, today),
+              isSelected: _isSameDay(date, selectedDate),
+              isCompleted: habit.isCompletedOn(date),
+              isSaving: savingDateKey == Habit.dateKeyFor(date),
+              onTap: () => onToggleDate(date),
+            );
+          },
+        ),
+      ],
     );
   }
 }
 
 class _MonthArrowButton extends StatelessWidget {
-  const _MonthArrowButton({
-    required this.icon,
-    required this.onPressed,
-  });
+  const _MonthArrowButton({required this.icon, required this.onPressed});
 
   final IconData icon;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return Material(
-      color: Colors.white.withValues(alpha: 0.08),
+      color: theme.panel,
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(999),
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 18,
-          ),
+          child: Icon(icon, color: theme.accentStrong, size: 18),
         ),
       ),
     );
@@ -705,17 +1244,22 @@ class _CalendarDayCell extends StatelessWidget {
     required this.date,
     required this.isToday,
     required this.isSelected,
+    required this.isCompleted,
+    required this.isSaving,
     required this.onTap,
   });
 
   final DateTime date;
   final bool isToday;
   final bool isSelected;
+  final bool isCompleted;
+  final bool isSaving;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isSelected ? Colors.white : Colors.white70;
+    final theme = _DailyThemeScope.of(context);
+    final textColor = isCompleted ? Colors.white : theme.ink;
 
     return Material(
       color: Colors.transparent,
@@ -726,42 +1270,53 @@ class _CalendarDayCell extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            gradient: isSelected
-                ? const LinearGradient(
-                    colors: [
-                      Color(0xFFF97316),
-                      Color(0xFFFB7185),
-                    ],
+            gradient: isCompleted
+                ? LinearGradient(
+                    colors: [theme.accent, theme.accentAlt],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
                 : null,
-            color: isSelected ? null : Colors.white.withValues(alpha: 0.06),
+            color: isCompleted ? null : theme.dayCellSurface,
             border: Border.all(
-              color: isToday
-                  ? Colors.white.withValues(alpha: 0.45)
-                  : Colors.white.withValues(alpha: 0.1),
+              color: isSelected
+                  ? theme.accentStrong
+                  : isToday
+                  ? theme.accent.withValues(alpha: 0.55)
+                  : theme.dayCellBorder,
+              width: isSelected ? 2 : 1,
             ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                '${date.day}',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: textColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
+              if (isSaving)
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: isCompleted ? Colors.white : theme.accentStrong,
+                  ),
+                )
+              else
+                Text(
+                  '${date.day}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               const SizedBox(height: 4),
-              Container(
-                width: 6,
-                height: 6,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: isToday || isCompleted ? 6 : 0,
+                height: isToday || isCompleted ? 6 : 0,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isToday
+                  color: isCompleted
                       ? Colors.white
-                      : Colors.white.withValues(alpha: 0),
+                      : theme.accent.withValues(alpha: isToday ? 1 : 0),
                 ),
               ),
             ],
@@ -772,27 +1327,422 @@ class _CalendarDayCell extends StatelessWidget {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({
-    required this.label,
+class _SettingsDialog extends StatelessWidget {
+  const _SettingsDialog({
+    required this.completedCount,
+    required this.totalCount,
+    required this.savedLabel,
+    required this.syncTitle,
+    required this.syncDetail,
+    required this.isBridgeConnected,
+    required this.isImporting,
+    required this.isExporting,
+    required this.selectedTheme,
+    required this.onThemeChanged,
+    required this.onImport,
+    required this.onExport,
   });
+
+  final int completedCount;
+  final int totalCount;
+  final String savedLabel;
+  final String syncTitle;
+  final String syncDetail;
+  final bool isBridgeConnected;
+  final bool isImporting;
+  final bool isExporting;
+  final DailyThemeChoice selectedTheme;
+  final ValueChanged<DailyThemeChoice> onThemeChanged;
+  final VoidCallback onImport;
+  final VoidCallback onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+          decoration: BoxDecoration(
+            color: theme.canvas,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: theme.glassShadow,
+                blurRadius: 42,
+                offset: Offset(0, 24),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '设置',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: theme.ink,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '关闭',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                      color: theme.accentStrong,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  '主题配色',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: theme.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _ThemeOptionList(
+                  selectedTheme: selectedTheme,
+                  onThemeChanged: onThemeChanged,
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  '同步',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: theme.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _SyncStatusCard(
+                  title: syncTitle,
+                  detail: syncDetail,
+                  isConnected: isBridgeConnected,
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  '数据',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: theme.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _WarmMetricChip(
+                      label: '今天已完成 $completedCount / $totalCount',
+                    ),
+                    _WarmMetricChip(label: savedLabel),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SettingsActionButton(
+                        label: '导入备份',
+                        icon: Icons.file_open_outlined,
+                        isBusy: isImporting,
+                        onPressed: isImporting ? null : onImport,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _SettingsActionButton(
+                        label: '导出备份',
+                        icon: Icons.download_rounded,
+                        isBusy: isExporting,
+                        onPressed: isExporting ? null : onExport,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThemeOptionList extends StatelessWidget {
+  const _ThemeOptionList({
+    required this.selectedTheme,
+    required this.onThemeChanged,
+  });
+
+  final DailyThemeChoice selectedTheme;
+  final ValueChanged<DailyThemeChoice> onThemeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final choice in DailyThemeChoice.values) ...[
+          _ThemeOptionTile(
+            spec: _themeFor(choice),
+            isSelected: selectedTheme == choice,
+            onTap: () => onThemeChanged(choice),
+          ),
+          if (choice != DailyThemeChoice.values.last)
+            const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _ThemeOptionTile extends StatelessWidget {
+  const _ThemeOptionTile({
+    required this.spec,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final DailyThemeSpec spec;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? theme.panelAlt
+            : theme.panelAlt.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSelected
+              ? theme.accent.withValues(alpha: 0.52)
+              : theme.chipBorder,
+          width: isSelected ? 1.4 : 1,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: theme.glassShadow.withValues(alpha: 0.58),
+                  blurRadius: 18,
+                  offset: const Offset(0, 10),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: spec.backgroundColors,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(color: spec.glassBorder),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [spec.accent, spec.accentAlt],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        spec.name,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: theme.ink,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        spec.caption,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: theme.inkMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedScale(
+                  duration: const Duration(milliseconds: 160),
+                  scale: isSelected ? 1 : 0.78,
+                  child: Icon(
+                    isSelected
+                        ? Icons.check_circle_rounded
+                        : Icons.circle_outlined,
+                    color: isSelected ? theme.accentStrong : theme.inkMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncStatusCard extends StatelessWidget {
+  const _SyncStatusCard({
+    required this.title,
+    required this.detail,
+    required this.isConnected,
+  });
+
+  final String title;
+  final String detail;
+  final bool isConnected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final statusColor = isConnected ? const Color(0xFF16A34A) : theme.accentAlt;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.panelAlt,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: statusColor.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            margin: const EdgeInsets.only(top: 5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: statusColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: theme.ink,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  detail,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: theme.inkMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsActionButton extends StatelessWidget {
+  const _SettingsActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.isBusy = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool isBusy;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: onPressed,
+      icon: isBusy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : Icon(icon, size: 18),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      ),
+    );
+  }
+}
+
+class _WarmMetricChip extends StatelessWidget {
+  const _WarmMetricChip({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
+        color: theme.chipSurface,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(color: theme.chipBorder),
       ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white70,
-            ),
+          color: theme.inkMuted,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -811,6 +1761,8 @@ class _GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(
@@ -819,20 +1771,15 @@ class _GlassPanel extends StatelessWidget {
           padding: padding,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
-            gradient: const LinearGradient(
-              colors: [
-                Color(0x26FFFFFF),
-                Color(0x0CFFFFFF),
-              ],
+            gradient: LinearGradient(
+              colors: [theme.glassTop, theme.glassBottom],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.16),
-            ),
-            boxShadow: const [
+            border: Border.all(color: theme.glassBorder),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x26000000),
+                color: theme.glassShadow,
                 blurRadius: 36,
                 offset: Offset(0, 18),
               ),
@@ -846,10 +1793,7 @@ class _GlassPanel extends StatelessWidget {
 }
 
 class _AmbientGlow extends StatelessWidget {
-  const _AmbientGlow({
-    required this.size,
-    required this.colors,
-  });
+  const _AmbientGlow({required this.size, required this.colors});
 
   final double size;
   final List<Color> colors;
@@ -869,52 +1813,49 @@ class _AmbientGlow extends StatelessWidget {
   }
 }
 
-class _GlassToolbarButton extends StatelessWidget {
-  const _GlassToolbarButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-    this.isBusy = false,
-  });
+class _SettingsFloatingButton extends StatelessWidget {
+  const _SettingsFloatingButton({required this.onPressed});
 
-  final String label;
-  final IconData icon;
-  final VoidCallback? onPressed;
-  final bool isBusy;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: onPressed == null ? 0.6 : 1,
-      child: _GlassPanel(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        borderRadius: 20,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(20),
+    final theme = _DailyThemeScope.of(context);
+
+    return _GlassPanel(
+      padding: EdgeInsets.zero,
+      borderRadius: 22,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (isBusy)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                else
-                  Icon(icon, color: Colors.white, size: 18),
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: theme.glassControl,
+                    border: Border.all(color: theme.glassBorder),
+                  ),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    size: 17,
+                    color: theme.onBackground,
+                  ),
+                ),
                 const SizedBox(width: 10),
                 Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  '设置',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: theme.onBackground,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -926,14 +1867,14 @@ class _GlassToolbarButton extends StatelessWidget {
 }
 
 class _GlassFloatingButton extends StatelessWidget {
-  const _GlassFloatingButton({
-    required this.onPressed,
-  });
+  const _GlassFloatingButton({required this.onPressed});
 
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return _GlassPanel(
       padding: EdgeInsets.zero,
       borderRadius: 22,
@@ -950,28 +1891,21 @@ class _GlassFloatingButton extends StatelessWidget {
                 Container(
                   width: 30,
                   height: 30,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [
-                        Color(0xFFF97316),
-                        Color(0xFFFB7185),
-                      ],
+                      colors: [theme.accent, theme.accentAlt],
                     ),
                   ),
-                  child: const Icon(
-                    Icons.add,
-                    size: 18,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.add, size: 18, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
                 Text(
                   '添加习惯',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: theme.onBackground,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -983,14 +1917,12 @@ class _GlassFloatingButton extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.selectedDate,
-  });
-
-  final DateTime selectedDate;
+  const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
@@ -1003,13 +1935,10 @@ class _EmptyState extends StatelessWidget {
               Container(
                 width: 58,
                 height: 58,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
-                    colors: [
-                      Color(0xFFF97316),
-                      Color(0xFFFB7185),
-                    ],
+                    colors: [theme.accent, theme.accentAlt],
                   ),
                 ),
                 child: const Icon(
@@ -1022,17 +1951,17 @@ class _EmptyState extends StatelessWidget {
               Text(
                 '还没有习惯',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: theme.onBackground,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                '先创建习惯，再在 ${_selectedDateLabel(selectedDate)} 这一天点一下打卡。',
+                '先创建一个习惯。之后点开习惯卡片，就能在日历里补记或取消任意一天。',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white70,
-                    ),
+                  color: theme.onBackgroundMuted,
+                ),
               ),
             ],
           ),
@@ -1046,203 +1975,197 @@ class GlassHabitCard extends StatelessWidget {
   const GlassHabitCard({
     super.key,
     required this.habit,
-    required this.selectedDate,
-    required this.onToggle,
+    required this.today,
+    required this.onOpenCalendar,
+    required this.onToggleToday,
     required this.onEdit,
     required this.onDelete,
   });
 
   final Habit habit;
-  final DateTime selectedDate;
-  final VoidCallback onToggle;
+  final DateTime today;
+  final VoidCallback onOpenCalendar;
+  final VoidCallback onToggleToday;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final isCompleted = habit.isCompletedOn(selectedDate);
-    final completedThisMonth = habit.completedCountInMonth(selectedDate);
+    final theme = _DailyThemeScope.of(context);
+    final isCompleted = habit.isCompletedOn(today);
+    final completedThisMonth = habit.completedCountInMonth(today);
 
     return _GlassPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                key: ValueKey('habit-toggle-${habit.id}'),
-                onTap: onToggle,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: isCompleted
-                        ? const LinearGradient(
-                            colors: [
-                              Color(0xFFF97316),
-                              Color(0xFFFB7185),
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color:
-                        isCompleted ? null : Colors.white.withValues(alpha: 0.08),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.28),
-                    ),
-                  ),
-                  child: Icon(
-                    isCompleted
-                        ? Icons.check_rounded
-                        : Icons.radio_button_unchecked_rounded,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
+      padding: EdgeInsets.zero,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onOpenCalendar,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
+                    GestureDetector(
+                      key: ValueKey('habit-toggle-${habit.id}'),
+                      onTap: onToggleToday,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: isCompleted
+                              ? LinearGradient(
+                                  colors: [theme.accent, theme.accentAlt],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          color: isCompleted ? null : theme.cardControl,
+                          border: Border.all(color: theme.glassBorder),
+                        ),
+                        child: Icon(
+                          isCompleted
+                              ? Icons.check_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          color: theme.onBackground,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
                             habit.title,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
+                                  color: theme.onBackground,
+                                  fontWeight: FontWeight.w800,
                                 ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        _StatusChip(
-                          label: isCompleted ? '已完成' : '未完成',
-                          isCompleted: isCompleted,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${_selectedDateLabel(selectedDate)} · 点左侧圆点即可记录这一天是否完成',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white60,
+                          const SizedBox(height: 8),
+                          _StatusChip(
+                            label: isCompleted ? '今天已完成' : '今天未完成',
+                            isCompleted: isCompleted,
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${_selectedDateLabel(today)} · 点卡片查看打卡日历',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: theme.onBackgroundSoft),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _MetricChip(label: '本月完成 $completedThisMonth 天'),
+                    _MetricChip(label: '累计记录 ${habit.completedDates.length} 天'),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _GlassActionButton(
+                      onPressed: onOpenCalendar,
+                      icon: Icons.calendar_month_rounded,
+                      label: '日历',
+                    ),
+                    _GlassActionButton(
+                      onPressed: onToggleToday,
+                      icon: isCompleted
+                          ? Icons.remove_done_rounded
+                          : Icons.check_circle_outline_rounded,
+                      label: isCompleted ? '取消今天' : '完成今天',
+                    ),
+                    _GlassActionButton(
+                      onPressed: onEdit,
+                      icon: Icons.edit_outlined,
+                      label: '编辑',
+                    ),
+                    _GlassActionButton(
+                      onPressed: onDelete,
+                      icon: Icons.delete_outline,
+                      label: '删除',
+                      foregroundColor: theme.onBackgroundMuted,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _MetricChip(label: '本月完成 $completedThisMonth 天'),
-              _MetricChip(label: '累计记录 ${habit.completedDates.length} 天'),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _GlassActionButton(
-                onPressed: onToggle,
-                icon: isCompleted
-                    ? Icons.remove_done_rounded
-                    : Icons.check_circle_outline_rounded,
-                label: isCompleted ? '取消完成' : '记为完成',
-              ),
-              _GlassActionButton(
-                onPressed: onEdit,
-                icon: Icons.edit_outlined,
-                label: '编辑',
-              ),
-              _GlassActionButton(
-                onPressed: onDelete,
-                icon: Icons.delete_outline,
-                label: '删除',
-                foregroundColor: Colors.white70,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    required this.label,
-    required this.isCompleted,
-  });
+  const _StatusChip({required this.label, required this.isCompleted});
 
   final String label;
   final bool isCompleted;
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: isCompleted
-            ? const LinearGradient(
-                colors: [
-                  Color(0xFFF97316),
-                  Color(0xFFFB7185),
-                ],
-              )
+            ? LinearGradient(colors: [theme.accent, theme.accentAlt])
             : null,
-        color: isCompleted ? null : Colors.white.withValues(alpha: 0.08),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.14),
-        ),
+        color: isCompleted ? null : theme.cardControl,
+        border: Border.all(color: theme.glassBorder),
       ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
+          color: isCompleted ? Colors.white : theme.onBackground,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
 }
 
 class _MetricChip extends StatelessWidget {
-  const _MetricChip({
-    required this.label,
-  });
+  const _MetricChip({required this.label});
 
   final String label;
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: theme.cardControl,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: theme.glassBorder),
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white70,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: theme.onBackgroundMuted),
       ),
     );
   }
@@ -1253,23 +2176,24 @@ class _GlassActionButton extends StatelessWidget {
     required this.onPressed,
     required this.icon,
     required this.label,
-    this.foregroundColor = Colors.white,
+    this.foregroundColor,
   });
 
   final VoidCallback onPressed;
   final IconData icon;
   final String label;
-  final Color foregroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final color = foregroundColor ?? theme.onBackground;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
+        color: theme.cardControl,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: theme.glassBorder),
       ),
       child: Material(
         color: Colors.transparent,
@@ -1281,14 +2205,14 @@ class _GlassActionButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 16, color: foregroundColor),
+                Icon(icon, size: 16, color: color),
                 const SizedBox(width: 6),
                 Text(
                   label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: foregroundColor,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
