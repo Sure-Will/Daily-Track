@@ -4,7 +4,7 @@ import 'dart:io';
 import 'habit_bridge_types.dart';
 import '../models/habit.dart';
 
-const _defaultDataPath = '/Users/sure/repos/Daily-Track/data/daily-track.json';
+const _defaultDataPath = 'data/daily-track.json';
 const _dataPathEnvKey = 'DAILY_TRACK_DATA_PATH';
 
 String? _dataPathOverride;
