@@ -36,6 +36,9 @@ migrate_working_dir/
 # Packaged distribution artifacts
 /dist/
 
+# Local runtime data (real check-ins); seed lives in data/daily-track.example.json
+/data/daily-track.json
+
 # Symbolication related
 app.*.symbols
 

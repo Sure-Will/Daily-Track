@@ -30,7 +30,7 @@
   - `habit_bridge_stub.dart`：空实现回退
 - `lib/services/backup_io*.dart`：按平台选择的导入/导出工具
 - `bin/daily_track_bridge.dart`：供 Web 应用与 Hermes 使用的 localhost JSON bridge
-- `data/daily-track.json`：示例数据文件（默认种子；真实数据在运行时写入）
+- `data/daily-track.example.json`：示例种子数据；应用运行时把真实数据写入 `data/daily-track.json`（已 gitignore）
 - `test/widget_test.dart`：界面冒烟测试
 - `web/`：Web 运行器与 manifest
 - `macos/`：macOS 桌面运行器

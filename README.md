@@ -30,7 +30,7 @@ A Flutter habit tracker with calendar-based check-ins. Runs in the browser and a
   - `habit_bridge_stub.dart` — no-op fallback
 - `lib/services/backup_io*.dart` — import/export helpers, selected per platform
 - `bin/daily_track_bridge.dart` — localhost JSON bridge for the web app and Hermes
-- `data/daily-track.json` — sample data file (default seed; real data is written at runtime)
+- `data/daily-track.example.json` — sample seed data; the app writes real data to `data/daily-track.json` (gitignored) at runtime
 - `test/widget_test.dart` — widget smoke test
 - `web/` — web runner and manifest
 - `macos/` — macOS desktop runner
