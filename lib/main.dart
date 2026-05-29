@@ -7,9 +7,6 @@ import 'models/habit.dart';
 import 'services/backup_io.dart';
 import 'services/habit_storage.dart';
 
-const _ink = Color(0xFF431407);
-const _warmCanvas = Color(0xFFFFF7ED);
-const _warmPanel = Color(0xFFFFEDD5);
 const _brandOrange = Color(0xFFF97316);
 const _brandOrangeDark = Color(0xFFEA580C);
 const _brandAmber = Color(0xFFF59E0B);
@@ -121,20 +118,20 @@ DailyThemeSpec _themeFor(DailyThemeChoice choice) {
     DailyThemeChoice.ember => const DailyThemeSpec(
       choice: DailyThemeChoice.ember,
       name: '活力橙',
-      caption: '当前默认',
-      brightness: Brightness.light,
+      caption: '暖橙、琥珀、夕阳',
+      brightness: Brightness.dark,
       seed: _brandOrange,
       accent: _brandOrange,
       accentStrong: _brandOrangeDark,
       accentAlt: _brandAmber,
-      ink: _ink,
-      inkMuted: Color(0xA3431407),
-      canvas: _warmCanvas,
-      panel: _warmPanel,
-      panelAlt: Color(0xFFFFFFFF),
+      ink: Color(0xFFFFF1E6),
+      inkMuted: Color(0xB8FFF1E6),
+      canvas: Color(0xFF3E180D),
+      panel: Color(0xFF5A2614),
+      panelAlt: Color(0xFF4E2113),
       backgroundColors: [
-        Color(0xFF2A120B),
-        Color(0xFF7C2D12),
+        Color(0xFF6B2810),
+        Color(0xFFB0431A),
         Color(0xFFF97316),
       ],
       washColors: [
@@ -148,17 +145,17 @@ DailyThemeSpec _themeFor(DailyThemeChoice choice) {
       glassTop: Color(0x26FFFFFF),
       glassBottom: Color(0x0CFFFFFF),
       glassBorder: Color(0x29FFFFFF),
-      glassShadow: Color(0x26000000),
+      glassShadow: Color(0x4D000000),
       glassControl: Color(0x24FFFFFF),
       cardControl: Color(0x14FFFFFF),
-      chipSurface: _warmPanel,
-      chipBorder: Color(0xFFFFD7AA),
-      dayCellSurface: Color(0xB8FFFFFF),
-      dayCellBorder: Color(0xFFFFD7AA),
+      chipSurface: Color(0xFF4E2113),
+      chipBorder: Color(0xFF6E3A22),
+      dayCellSurface: Color(0xFF4E2113),
+      dayCellBorder: Color(0xFF6E3A22),
     ),
     DailyThemeChoice.pureLight => const DailyThemeSpec(
       choice: DailyThemeChoice.pureLight,
-      name: '纯亮',
+      name: '浅色主题',
       caption: '白瓷、银灰、清透蓝',
       brightness: Brightness.light,
       seed: Color(0xFF2563EB),
@@ -172,13 +169,13 @@ DailyThemeSpec _themeFor(DailyThemeChoice choice) {
       panelAlt: Colors.white,
       backgroundColors: [
         Color(0xFFFFFFFF),
-        Color(0xFFF8FAFC),
-        Color(0xFFEFF6FF),
+        Color(0xFFF4F8FF),
+        Color(0xFFE4EDFF),
       ],
       washColors: [
-        [Color(0x44BFDBFE), Color(0x00BFDBFE)],
-        [Color(0x38A7F3D0), Color(0x00A7F3D0)],
-        [Color(0x30C4B5FD), Color(0x00C4B5FD)],
+        [Color(0x4AC4B5FD), Color(0x00C4B5FD)],
+        [Color(0x4A67E8F9), Color(0x0067E8F9)],
+        [Color(0x5C93C5FD), Color(0x0093C5FD)],
       ],
       onBackground: Color(0xFF111827),
       onBackgroundMuted: Color(0xB3111827),
@@ -196,7 +193,7 @@ DailyThemeSpec _themeFor(DailyThemeChoice choice) {
     ),
     DailyThemeChoice.deepDark => const DailyThemeSpec(
       choice: DailyThemeChoice.deepDark,
-      name: '深色',
+      name: '深色主题',
       caption: '墨黑、石墨、极光青',
       brightness: Brightness.dark,
       seed: Color(0xFF22D3EE),

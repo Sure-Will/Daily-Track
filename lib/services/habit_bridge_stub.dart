@@ -8,3 +8,7 @@ Future<HabitBridgeSnapshot?> loadFromBridge() async {
 Future<HabitBridgeSnapshot?> saveToBridge(List<Habit> habits) async {
   return null;
 }
+
+void setDataPathOverrideForTesting(String? path) {}
+
+void setDisabledForTesting(bool isDisabled) {}

@@ -57,3 +57,7 @@ Future<HabitBridgeSnapshot?> _sendBridgeRequest(
     return null;
   }
 }
+
+void setDataPathOverrideForTesting(String? path) {}
+
+void setDisabledForTesting(bool isDisabled) {}
