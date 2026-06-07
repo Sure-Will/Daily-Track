@@ -57,6 +57,14 @@ void main() {
     expect(find.text('${today.year} 年 ${today.month} 月'), findsOneWidget);
     expect(find.byKey(todayKey), findsOneWidget);
 
+    await tester.tap(find.text('年视图'));
+    await _pumpUi(tester);
+
+    expect(find.text('${today.year} 年视图'), findsOneWidget);
+
+    await tester.tap(find.text('月视图'));
+    await _pumpUi(tester);
+
     await tester.tap(find.byIcon(Icons.close_rounded));
     await _pumpUi(tester);
 

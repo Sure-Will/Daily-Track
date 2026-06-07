@@ -6,12 +6,14 @@ A Flutter habit tracker with calendar-based check-ins. Runs in the browser and a
 
 ## Status
 
-- Records habit completion by date through a calendar-based UI.
+- Records habit completion by date through a calendar-based UI, with both month and year-at-a-glance views per habit.
+- Each habit card carries an inline mini-month calendar and adapts its layout to wide or narrow windows.
 - Runs as a web app in Chrome and as a native macOS desktop app from one codebase.
 - Multiple themes (dark 活力橙, light 浅色主题, and more) with live switching.
 - Local JSON persistence, chosen per platform:
   - **macOS desktop** reads and writes the JSON data file directly.
   - **Web** syncs to a local JSON bridge, falling back to browser-local storage when the bridge is offline.
+- Auto-refresh keeps the view current: external check-ins (e.g. from the Hermes bridge) show up within ~30s, the date rolls over at midnight, and a refresh never clobbers an in-progress local check-in.
 - Import and export for local JSON backups.
 
 ## Supported Platforms
@@ -100,5 +102,6 @@ flutter build macos
 ## Notes
 
 - On macOS the app owns the JSON file directly; with the web bridge running, the browser and Telegram/Hermes can share the same file.
+- The app polls its store about every 30s, so external writes (Hermes/Telegram) surface automatically. The poll only rebuilds the UI when the data actually changed, and it yields while a local save is in flight, so it never drops a check-in you just made.
 - Without the bridge, web data is stored in the browser and survives refreshes only on the same profile and origin.
 - The storage layer keeps a fallback reader for the old `daily_routine` key so existing local data still loads.

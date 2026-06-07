@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -358,19 +360,47 @@ class DailyHomePage extends StatefulWidget {
   State<DailyHomePage> createState() => _DailyHomePageState();
 }
 
-class _DailyHomePageState extends State<DailyHomePage> {
+class _DailyHomePageState extends State<DailyHomePage>
+    with WidgetsBindingObserver {
+  static const _dataRefreshInterval = Duration(seconds: 30);
+
   final HabitStorage _storage = HabitStorage();
 
   List<Habit> _habits = const <Habit>[];
   bool _isLoading = true;
   bool _isImporting = false;
   bool _isExporting = false;
+  bool _isRefreshing = false;
+  bool _isPersisting = false;
+  DateTime _today = _dateOnly(DateTime.now());
+  Timer? _midnightTimer;
+  Timer? _dataRefreshTimer;
   DateTime? _lastSavedAt;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadHabits();
+    _scheduleMidnightRefresh();
+    _dataRefreshTimer = Timer.periodic(_dataRefreshInterval, (_) {
+      _refreshCurrentState();
+    });
+  }
+
+  @override
+  void dispose() {
+    _midnightTimer?.cancel();
+    _dataRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshCurrentState();
+    }
   }
 
   Future<void> _loadHabits() async {
@@ -385,15 +415,70 @@ class _DailyHomePageState extends State<DailyHomePage> {
     });
   }
 
+  Future<void> _refreshCurrentState() async {
+    // Skip while a save is in flight: reading the store mid-write would pull
+    // pre-write data and clobber the optimistic update (data-loss race).
+    if (_isRefreshing || _isPersisting) {
+      return;
+    }
+
+    _isRefreshing = true;
+    try {
+      final nextToday = _dateOnly(DateTime.now());
+      final habits = await _storage.loadHabits();
+      if (!mounted) {
+        return;
+      }
+
+      // Only rebuild when something actually changed (external write via the
+      // bridge, or a date rollover). Avoids a needless full-page rebuild every
+      // poll tick when nothing moved.
+      final dateChanged = nextToday != _today;
+      final dataChanged = _encodeHabits(habits) != _encodeHabits(_habits);
+      if (dateChanged || dataChanged) {
+        setState(() {
+          _today = nextToday;
+          _habits = habits;
+          _isLoading = false;
+        });
+      }
+      _scheduleMidnightRefresh();
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  String _encodeHabits(List<Habit> habits) =>
+      jsonEncode(habits.map((habit) => habit.toJson()).toList());
+
+  void _scheduleMidnightRefresh() {
+    _midnightTimer?.cancel();
+
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final delay = tomorrow.difference(now) + const Duration(seconds: 1);
+
+    _midnightTimer = Timer(delay, () {
+      _refreshCurrentState();
+    });
+  }
+
   Future<void> _persistHabits(
     List<Habit> habits, {
     String? successMessage,
   }) async {
+    // Hold the "writing" flag across the optimistic update and the disk write
+    // so a concurrent _refreshCurrentState yields instead of reverting us.
+    _isPersisting = true;
     setState(() {
       _habits = habits;
     });
 
-    await _storage.saveHabits(habits);
+    try {
+      await _storage.saveHabits(habits);
+    } finally {
+      _isPersisting = false;
+    }
     if (!mounted) {
       return;
     }
@@ -492,7 +577,7 @@ class _DailyHomePageState extends State<DailyHomePage> {
   }
 
   Future<void> _toggleHabitToday(Habit habit) async {
-    await _toggleHabitOnDate(habit, DateTime.now());
+    await _toggleHabitOnDate(habit, _today);
   }
 
   Future<void> _openHabitCalendar(Habit habit) async {
@@ -730,9 +815,8 @@ class _DailyHomePageState extends State<DailyHomePage> {
   @override
   Widget build(BuildContext context) {
     final theme = _DailyThemeScope.of(context);
-    final today = _dateOnly(DateTime.now());
     final completedCount = _habits
-        .where((habit) => habit.isCompletedOn(today))
+        .where((habit) => habit.isCompletedOn(_today))
         .length;
 
     return Scaffold(
@@ -778,12 +862,12 @@ class _DailyHomePageState extends State<DailyHomePage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _Header(),
+                              _Header(today: _today),
                               const SizedBox(height: 26),
                               _SectionHeader(
                                 title: '今日习惯',
                                 detail:
-                                    '${_selectedDateLabel(today)} · $completedCount / ${_habits.length}',
+                                    '${_selectedDateLabel(_today)} · $completedCount / ${_habits.length}',
                               ),
                               const SizedBox(height: 14),
                               AnimatedSwitcher(
@@ -809,7 +893,7 @@ class _DailyHomePageState extends State<DailyHomePage> {
 
                                       return GlassHabitCard(
                                         habit: habit,
-                                        today: today,
+                                        today: _today,
                                         onOpenCalendar: () =>
                                             _openHabitCalendar(habit),
                                         onToggleToday: () =>
@@ -857,12 +941,9 @@ class _DailyHomePageState extends State<DailyHomePage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.today});
 
-  String _todayLabel() {
-    final now = DateTime.now();
-    return '${now.year} 年 ${now.month} 月 ${now.day} 日';
-  }
+  final DateTime today;
 
   @override
   Widget build(BuildContext context) {
@@ -872,7 +953,7 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _todayLabel(),
+          '${today.year} 年 ${today.month} 月 ${today.day} 日',
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: theme.onBackgroundMuted),
@@ -931,6 +1012,8 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+enum _CalendarDialogView { month, year }
+
 class _HabitCalendarDialog extends StatefulWidget {
   const _HabitCalendarDialog({required this.habit, required this.onToggleDate});
 
@@ -945,6 +1028,8 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
   late Habit _habit;
   late DateTime _displayMonth;
   late DateTime _selectedDate;
+  late int _displayYear;
+  _CalendarDialogView _calendarView = _CalendarDialogView.month;
   String? _savingDateKey;
 
   @override
@@ -955,6 +1040,7 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
     _habit = widget.habit;
     _selectedDate = today;
     _displayMonth = DateTime(today.year, today.month);
+    _displayYear = today.year;
   }
 
   void _changeMonth(int offset) {
@@ -967,6 +1053,7 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
 
     setState(() {
       _displayMonth = normalizedNextMonth;
+      _displayYear = normalizedNextMonth.year;
       if (_selectedDate.year != normalizedNextMonth.year ||
           _selectedDate.month != normalizedNextMonth.month) {
         _selectedDate =
@@ -975,6 +1062,23 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
             ? today
             : normalizedNextMonth;
       }
+    });
+  }
+
+  void _changeYear(int offset) {
+    setState(() {
+      _displayYear += offset;
+    });
+  }
+
+  void _selectDateFromYear(DateTime date) {
+    final normalizedDate = _dateOnly(date);
+
+    setState(() {
+      _selectedDate = normalizedDate;
+      _displayMonth = DateTime(normalizedDate.year, normalizedDate.month);
+      _displayYear = normalizedDate.year;
+      _calendarView = _CalendarDialogView.month;
     });
   }
 
@@ -1007,7 +1111,9 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: BoxConstraints(
+          maxWidth: _calendarView == _CalendarDialogView.year ? 940 : 560,
+        ),
         child: Container(
           padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
           decoration: BoxDecoration(
@@ -1062,6 +1168,15 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                _CalendarViewSwitch(
+                  selectedView: _calendarView,
+                  onChanged: (view) {
+                    setState(() {
+                      _calendarView = view;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -1070,17 +1185,34 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
                     _WarmMetricChip(
                       label: '累计记录 ${_habit.completedDates.length} 天',
                     ),
-                    _WarmMetricChip(label: '点日期切换打卡'),
+                    _WarmMetricChip(
+                      label: _calendarView == _CalendarDialogView.month
+                          ? '点日期切换打卡'
+                          : '点日期进入月份',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 18),
-                _CalendarPanel(
-                  displayMonth: _displayMonth,
-                  selectedDate: _selectedDate,
-                  habit: _habit,
-                  savingDateKey: _savingDateKey,
-                  onToggleDate: _toggleDate,
-                  onChangeMonth: _changeMonth,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: _calendarView == _CalendarDialogView.month
+                      ? _CalendarPanel(
+                          key: const ValueKey('month-calendar-view'),
+                          displayMonth: _displayMonth,
+                          selectedDate: _selectedDate,
+                          habit: _habit,
+                          savingDateKey: _savingDateKey,
+                          onToggleDate: _toggleDate,
+                          onChangeMonth: _changeMonth,
+                        )
+                      : _YearCalendarPanel(
+                          key: const ValueKey('year-calendar-view'),
+                          displayYear: _displayYear,
+                          selectedDate: _selectedDate,
+                          habit: _habit,
+                          onChangeYear: _changeYear,
+                          onSelectDate: _selectDateFromYear,
+                        ),
                 ),
                 const SizedBox(height: 18),
                 Align(
@@ -1100,8 +1232,107 @@ class _HabitCalendarDialogState extends State<_HabitCalendarDialog> {
   }
 }
 
+class _CalendarViewSwitch extends StatelessWidget {
+  const _CalendarViewSwitch({
+    required this.selectedView,
+    required this.onChanged,
+  });
+
+  final _CalendarDialogView selectedView;
+  final ValueChanged<_CalendarDialogView> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: theme.panelAlt,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: theme.chipBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _CalendarViewChip(
+            label: '月视图',
+            icon: Icons.calendar_month_rounded,
+            isSelected: selectedView == _CalendarDialogView.month,
+            onTap: () => onChanged(_CalendarDialogView.month),
+          ),
+          _CalendarViewChip(
+            label: '年视图',
+            icon: Icons.grid_view_rounded,
+            isSelected: selectedView == _CalendarDialogView.year,
+            onTap: () => onChanged(_CalendarDialogView.year),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarViewChip extends StatelessWidget {
+  const _CalendarViewChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        gradient: isSelected
+            ? LinearGradient(colors: [theme.accent, theme.accentAlt])
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 15,
+                  color: isSelected ? Colors.white : theme.inkMuted,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: isSelected ? Colors.white : theme.inkMuted,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CalendarPanel extends StatelessWidget {
   const _CalendarPanel({
+    super.key,
     required this.displayMonth,
     required this.selectedDate,
     required this.habit,
@@ -1317,6 +1548,266 @@ class _CalendarDayCell extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _YearCalendarPanel extends StatelessWidget {
+  const _YearCalendarPanel({
+    super.key,
+    required this.displayYear,
+    required this.selectedDate,
+    required this.habit,
+    required this.onChangeYear,
+    required this.onSelectDate,
+  });
+
+  final int displayYear;
+  final DateTime selectedDate;
+  final Habit habit;
+  final ValueChanged<int> onChangeYear;
+  final ValueChanged<DateTime> onSelectDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final today = _dateOnly(DateTime.now());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              '$displayYear 年视图',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: theme.ink,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const Spacer(),
+            _MonthArrowButton(
+              icon: Icons.chevron_left_rounded,
+              onPressed: () => onChangeYear(-1),
+            ),
+            const SizedBox(width: 6),
+            _MonthArrowButton(
+              icon: Icons.chevron_right_rounded,
+              onPressed: () => onChangeYear(1),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '橙色圆点是已完成日期，点任意日期进入对应月份。',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: theme.inkMuted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 16),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 12,
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 220,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 1.04,
+          ),
+          itemBuilder: (context, index) {
+            final month = DateTime(displayYear, index + 1);
+
+            return _YearMonthCard(
+              month: month,
+              selectedDate: selectedDate,
+              today: today,
+              habit: habit,
+              onSelectDate: onSelectDate,
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _YearMonthCard extends StatelessWidget {
+  const _YearMonthCard({
+    required this.month,
+    required this.selectedDate,
+    required this.today,
+    required this.habit,
+    required this.onSelectDate,
+  });
+
+  final DateTime month;
+  final DateTime selectedDate;
+  final DateTime today;
+  final Habit habit;
+  final ValueChanged<DateTime> onSelectDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final firstDayOfMonth = DateTime(month.year, month.month, 1);
+    final leadingEmptyCount = firstDayOfMonth.weekday - 1;
+    final daysInMonth = DateUtils.getDaysInMonth(month.year, month.month);
+    final completedCount = habit.completedCountInMonth(month);
+
+    final cells = <DateTime?>[
+      ...List<DateTime?>.filled(leadingEmptyCount, null),
+      for (var day = 1; day <= daysInMonth; day++)
+        DateTime(month.year, month.month, day),
+    ];
+    final trailingEmptyCount = 42 - cells.length;
+    cells.addAll(List<DateTime?>.filled(trailingEmptyCount, null));
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: theme.panelAlt.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: theme.chipBorder.withValues(alpha: 0.78)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '${month.month} 月',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: theme.ink,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$completedCount/$daysInMonth',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: completedCount > 0
+                      ? theme.accentStrong
+                      : theme.inkMuted,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List<Widget>.generate(7, (index) {
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    _weekdayLabel(index + 1),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: theme.inkMuted,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: GridView.builder(
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: cells.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                childAspectRatio: 1,
+              ),
+              itemBuilder: (context, index) {
+                final date = cells[index];
+                if (date == null) {
+                  return const SizedBox.shrink();
+                }
+
+                return _YearDayDot(
+                  date: date,
+                  isToday: _isSameDay(date, today),
+                  isSelected: _isSameDay(date, selectedDate),
+                  isCompleted: habit.isCompletedOn(date),
+                  onTap: () => onSelectDate(date),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _YearDayDot extends StatelessWidget {
+  const _YearDayDot({
+    required this.date,
+    required this.isToday,
+    required this.isSelected,
+    required this.isCompleted,
+    required this.onTap,
+  });
+
+  final DateTime date;
+  final bool isToday;
+  final bool isSelected;
+  final bool isCompleted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final borderColor = isSelected
+        ? theme.accentStrong
+        : isToday
+        ? theme.accentAlt
+        : theme.chipBorder.withValues(alpha: 0.72);
+
+    return Tooltip(
+      message: '${date.month} 月 ${date.day} 日 · ${isCompleted ? '已完成' : '未完成'}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: isCompleted ? 13 : 9,
+              height: isCompleted ? 13 : 9,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: isCompleted
+                    ? LinearGradient(colors: [theme.accent, theme.accentAlt])
+                    : null,
+                color: isCompleted
+                    ? null
+                    : theme.inkMuted.withValues(alpha: 0.16),
+                border: Border.all(
+                  color: borderColor,
+                  width: isSelected || isToday ? 1.6 : 1,
+                ),
+                boxShadow: isCompleted
+                    ? [
+                        BoxShadow(
+                          color: theme.accent.withValues(alpha: 0.24),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+            ),
           ),
         ),
       ),
@@ -1988,7 +2479,6 @@ class GlassHabitCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = _DailyThemeScope.of(context);
     final isCompleted = habit.isCompletedOn(today);
     final completedThisMonth = habit.completedCountInMonth(today);
 
@@ -2001,110 +2491,328 @@ class GlassHabitCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final details = _HabitCardDetails(
+                  habit: habit,
+                  today: today,
+                  isCompleted: isCompleted,
+                  completedThisMonth: completedThisMonth,
+                  onOpenCalendar: onOpenCalendar,
+                  onToggleToday: onToggleToday,
+                  onEdit: onEdit,
+                  onDelete: onDelete,
+                );
+                final miniCalendar = _MiniMonthCalendar(
+                  habit: habit,
+                  month: today,
+                  today: today,
+                );
+
+                if (constraints.maxWidth < 720) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      details,
+                      const SizedBox(height: 16),
+                      miniCalendar,
+                    ],
+                  );
+                }
+
+                return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GestureDetector(
-                      key: ValueKey('habit-toggle-${habit.id}'),
-                      onTap: onToggleToday,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: isCompleted
-                              ? LinearGradient(
-                                  colors: [theme.accent, theme.accentAlt],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : null,
-                          color: isCompleted ? null : theme.cardControl,
-                          border: Border.all(color: theme.glassBorder),
-                        ),
-                        child: Icon(
-                          isCompleted
-                              ? Icons.check_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          color: theme.onBackground,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            habit.title,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: theme.onBackground,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                          const SizedBox(height: 8),
-                          _StatusChip(
-                            label: isCompleted ? '今天已完成' : '今天未完成',
-                            isCompleted: isCompleted,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${_selectedDateLabel(today)} · 点卡片查看打卡日历',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: theme.onBackgroundSoft),
-                          ),
-                        ],
-                      ),
-                    ),
+                    Expanded(child: details),
+                    const SizedBox(width: 24),
+                    SizedBox(width: 252, child: miniCalendar),
                   ],
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _MetricChip(label: '本月完成 $completedThisMonth 天'),
-                    _MetricChip(label: '累计记录 ${habit.completedDates.length} 天'),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _GlassActionButton(
-                      onPressed: onOpenCalendar,
-                      icon: Icons.calendar_month_rounded,
-                      label: '日历',
-                    ),
-                    _GlassActionButton(
-                      onPressed: onToggleToday,
-                      icon: isCompleted
-                          ? Icons.remove_done_rounded
-                          : Icons.check_circle_outline_rounded,
-                      label: isCompleted ? '取消今天' : '完成今天',
-                    ),
-                    _GlassActionButton(
-                      onPressed: onEdit,
-                      icon: Icons.edit_outlined,
-                      label: '编辑',
-                    ),
-                    _GlassActionButton(
-                      onPressed: onDelete,
-                      icon: Icons.delete_outline,
-                      label: '删除',
-                      foregroundColor: theme.onBackgroundMuted,
-                    ),
-                  ],
-                ),
-              ],
+                );
+              },
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HabitCardDetails extends StatelessWidget {
+  const _HabitCardDetails({
+    required this.habit,
+    required this.today,
+    required this.isCompleted,
+    required this.completedThisMonth,
+    required this.onOpenCalendar,
+    required this.onToggleToday,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Habit habit;
+  final DateTime today;
+  final bool isCompleted;
+  final int completedThisMonth;
+  final VoidCallback onOpenCalendar;
+  final VoidCallback onToggleToday;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              key: ValueKey('habit-toggle-${habit.id}'),
+              onTap: onToggleToday,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isCompleted
+                      ? LinearGradient(
+                          colors: [theme.accent, theme.accentAlt],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: isCompleted ? null : theme.cardControl,
+                  border: Border.all(color: theme.glassBorder),
+                ),
+                child: Icon(
+                  isCompleted
+                      ? Icons.check_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: theme.onBackground,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    habit.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: theme.onBackground,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _StatusChip(
+                    label: isCompleted ? '今天已完成' : '今天未完成',
+                    isCompleted: isCompleted,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_selectedDateLabel(today)} · 点卡片查看打卡日历',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: theme.onBackgroundSoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _MetricChip(label: '本月完成 $completedThisMonth 天'),
+            _MetricChip(label: '累计记录 ${habit.completedDates.length} 天'),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _GlassActionButton(
+              onPressed: onOpenCalendar,
+              icon: Icons.calendar_month_rounded,
+              label: '日历',
+            ),
+            _GlassActionButton(
+              onPressed: onToggleToday,
+              icon: isCompleted
+                  ? Icons.remove_done_rounded
+                  : Icons.check_circle_outline_rounded,
+              label: isCompleted ? '取消今天' : '完成今天',
+            ),
+            _GlassActionButton(
+              onPressed: onEdit,
+              icon: Icons.edit_outlined,
+              label: '编辑',
+            ),
+            _GlassActionButton(
+              onPressed: onDelete,
+              icon: Icons.delete_outline,
+              label: '删除',
+              foregroundColor: theme.onBackgroundMuted,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniMonthCalendar extends StatelessWidget {
+  const _MiniMonthCalendar({
+    required this.habit,
+    required this.month,
+    required this.today,
+  });
+
+  final Habit habit;
+  final DateTime month;
+  final DateTime today;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+    final displayMonth = DateTime(month.year, month.month);
+    final firstDayOfMonth = DateTime(displayMonth.year, displayMonth.month, 1);
+    final leadingEmptyCount = firstDayOfMonth.weekday - 1;
+    final daysInMonth = DateUtils.getDaysInMonth(
+      displayMonth.year,
+      displayMonth.month,
+    );
+    final cells = <DateTime?>[
+      ...List<DateTime?>.filled(leadingEmptyCount, null),
+      for (var day = 1; day <= daysInMonth; day++)
+        DateTime(displayMonth.year, displayMonth.month, day),
+    ];
+    final trailingEmptyCount = (7 - cells.length % 7) % 7;
+    cells.addAll(List<DateTime?>.filled(trailingEmptyCount, null));
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        color: theme.cardControl,
+        border: Border.all(color: theme.glassBorder),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_view_month_rounded,
+                size: 16,
+                color: theme.onBackgroundMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${displayMonth.month} 月概览',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: theme.onBackground,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${habit.completedCountInMonth(displayMonth)}/$daysInMonth',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: theme.onBackgroundMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: List<Widget>.generate(7, (index) {
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    _weekdayLabel(index + 1),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: theme.onBackgroundSoft,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 6),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: cells.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 5,
+              crossAxisSpacing: 5,
+              childAspectRatio: 1,
+            ),
+            itemBuilder: (context, index) {
+              final date = cells[index];
+              if (date == null) {
+                return const SizedBox.shrink();
+              }
+
+              return _MiniMonthDay(
+                date: date,
+                isToday: _isSameDay(date, today),
+                isCompleted: habit.isCompletedOn(date),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniMonthDay extends StatelessWidget {
+  const _MiniMonthDay({
+    required this.date,
+    required this.isToday,
+    required this.isCompleted,
+  });
+
+  final DateTime date;
+  final bool isToday;
+  final bool isCompleted;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: isCompleted
+            ? LinearGradient(colors: [theme.accent, theme.accentAlt])
+            : null,
+        color: isCompleted ? null : theme.glassBottom,
+        border: Border.all(
+          color: isToday ? theme.accentAlt : theme.glassBorder,
+          width: isToday ? 1.6 : 1,
+        ),
+      ),
+      child: Text(
+        '${date.day}',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: isCompleted ? Colors.white : theme.onBackgroundMuted,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
