@@ -60,9 +60,25 @@ flutter pub get
 flutter run -d macos
 ```
 
-The desktop app reads and writes its data file directly. By default it uses the
-relative path `data/daily-track.json`; override it with the `DAILY_TRACK_DATA_PATH`
-environment variable.
+The desktop app reads and writes its data file directly. The path is resolved in
+this order:
+
+1. `DAILY_TRACK_DATA_PATH` environment variable
+2. `~/.daily-track` pointer file — a plain text file whose only content is the
+   absolute path of the data file (supports `~/` prefix)
+3. The relative path `data/daily-track.json` (resolved against the working
+   directory)
+
+Apps launched from Finder or the Dock get neither shell environment variables
+nor a useful working directory, so the pointer file is the reliable way to point
+an installed `.app` at your data file:
+
+```bash
+echo "/path/to/your/daily-track.json" > ~/.daily-track
+```
+
+Without it, a Finder-launched app silently falls back to an internal local
+cache and stops syncing with the JSON file.
 
 ### Web
 

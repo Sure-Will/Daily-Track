@@ -4,8 +4,9 @@ import 'dart:io';
 import 'habit_bridge_types.dart';
 import '../models/habit.dart';
 
-const _defaultDataPath = 'data/daily-track.json';
-const _dataPathEnvKey = 'DAILY_TRACK_DATA_PATH';
+const defaultDataPath = 'data/daily-track.json';
+const dataPathEnvKey = 'DAILY_TRACK_DATA_PATH';
+const pointerFileName = '.daily-track';
 
 String? _dataPathOverride;
 bool _isDisabledForTesting = false;
@@ -57,11 +58,68 @@ File _dataFile() {
     return File(_dataPathOverride!.trim()).absolute;
   }
 
-  final configuredPath = Platform.environment[_dataPathEnvKey];
-  final path = configuredPath == null || configuredPath.trim().isEmpty
-      ? _defaultDataPath
-      : configuredPath.trim();
-  return File(path).absolute;
+  return File(
+    resolveDataPath(
+      environment: Platform.environment,
+      pointerContent: _readPointerFile(),
+    ),
+  ).absolute;
+}
+
+/// Pure precedence logic (env var > pointer file > cwd-relative default),
+/// kept free of Platform/file-system access so it can be unit-tested.
+///
+/// The pointer file exists because GUI launches (Finder/Dock) get neither
+/// shell env vars nor a meaningful cwd, so a file in the home directory is
+/// the only config channel that reaches them.
+String resolveDataPath({
+  required Map<String, String> environment,
+  String? pointerContent,
+}) {
+  final configuredPath = environment[dataPathEnvKey]?.trim();
+  if (configuredPath != null && configuredPath.isNotEmpty) {
+    return expandHomePath(configuredPath, environment);
+  }
+
+  final pointedPath = pointerContent?.trim();
+  if (pointedPath != null && pointedPath.isNotEmpty) {
+    return expandHomePath(pointedPath, environment);
+  }
+
+  return defaultDataPath;
+}
+
+String expandHomePath(String path, Map<String, String> environment) {
+  if (!path.startsWith('~/')) {
+    return path;
+  }
+
+  final home = (environment['HOME'] ?? environment['USERPROFILE'])?.trim();
+  if (home == null || home.isEmpty) {
+    return path;
+  }
+
+  return '$home${path.substring(1)}';
+}
+
+String? _readPointerFile() {
+  final home =
+      (Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'])
+          ?.trim();
+  if (home == null || home.isEmpty) {
+    return null;
+  }
+
+  try {
+    final pointerFile = File('$home/$pointerFileName');
+    if (!pointerFile.existsSync()) {
+      return null;
+    }
+
+    return pointerFile.readAsStringSync();
+  } catch (_) {
+    return null;
+  }
 }
 
 Future<void> _ensureDataFile(File dataFile) async {

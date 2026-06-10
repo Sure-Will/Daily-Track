@@ -60,8 +60,21 @@ flutter pub get
 flutter run -d macos
 ```
 
-桌面应用会直接读写其数据文件。默认使用相对路径 `data/daily-track.json`，
-可通过环境变量 `DAILY_TRACK_DATA_PATH` 覆盖。
+桌面应用会直接读写其数据文件。路径按以下顺序解析：
+
+1. 环境变量 `DAILY_TRACK_DATA_PATH`
+2. 指针文件 `~/.daily-track` —— 纯文本文件，内容只有一行：数据文件的绝对路径
+   （支持 `~/` 前缀）
+3. 相对路径 `data/daily-track.json`（按进程工作目录解析）
+
+从 Finder 或 Dock 启动的 app 既拿不到 shell 环境变量，工作目录也不可用，
+所以给已安装的 `.app` 指定数据文件要靠指针文件：
+
+```bash
+echo "/path/to/your/daily-track.json" > ~/.daily-track
+```
+
+没有它的话，从 Finder 启动的 app 会静默退回内部本地缓存，不再与 JSON 文件同步。
 
 ### Web
 
