@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/habit.dart';
 import 'services/backup_io.dart';
+import 'services/habit_merge.dart';
 import 'services/habit_storage.dart';
 
 const _brandOrange = Color(0xFFF97316);
@@ -469,13 +470,30 @@ class _DailyHomePageState extends State<DailyHomePage>
   }) async {
     // Hold the "writing" flag across the optimistic update and the disk write
     // so a concurrent _refreshCurrentState yields instead of reverting us.
+    final baseHabits = _habits;
     _isPersisting = true;
     setState(() {
       _habits = habits;
     });
 
     try {
-      await _storage.saveHabits(habits);
+      // Re-read and three-way merge before writing: another writer (the
+      // bridge, Hermes) may have updated the store since our last poll, and a
+      // blind whole-file write would silently drop its changes.
+      final remoteHabits = await _storage.loadHabits();
+      final mergedHabits = mergeHabits(
+        base: baseHabits,
+        local: habits,
+        remote: remoteHabits,
+      );
+      await _storage.saveHabits(mergedHabits);
+
+      if (mounted &&
+          _encodeHabits(mergedHabits) != _encodeHabits(habits)) {
+        setState(() {
+          _habits = mergedHabits;
+        });
+      }
     } finally {
       _isPersisting = false;
     }
@@ -526,7 +544,7 @@ class _DailyHomePageState extends State<DailyHomePage>
           builder: (dialogContext) {
             return AlertDialog(
               title: const Text('删除这个习惯？'),
-              content: Text('“${habit.title}” 会从当前浏览器本地数据中移除。'),
+              content: Text('“${habit.title}” 会连同它的所有打卡记录一起删除。'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -863,6 +881,10 @@ class _DailyHomePageState extends State<DailyHomePage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _Header(today: _today),
+                              if (!_isLoading && !_storage.bridgeConnected) ...[
+                                const SizedBox(height: 16),
+                                const _StorageFallbackBanner(),
+                              ],
                               const SizedBox(height: 26),
                               _SectionHeader(
                                 title: '今日习惯',
@@ -935,6 +957,56 @@ class _DailyHomePageState extends State<DailyHomePage>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _StorageFallbackBanner extends StatelessWidget {
+  const _StorageFallbackBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = _DailyThemeScope.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.accent.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.accent.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.sync_problem_rounded, size: 20, color: theme.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '未连接本地 JSON 文件',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: theme.onBackground,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '打卡只会保存在本应用缓存里，外部记录不会同步进来。'
+                  '请检查 ~/.daily-track 指针文件，或启动 bridge 后重新打开。',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: theme.onBackgroundMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  softWrap: true,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
